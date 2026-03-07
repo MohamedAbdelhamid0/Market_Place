@@ -1,0 +1,727 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Marketplace Buyer App</title>
+
+  <style>
+
+    :root {
+      --bg: #f5f3ef;
+      --surface: #ffffff;
+      --surface-hover: #fafaf9;
+      --text: #1a1a1a;
+      --text-muted: #6b6b6b;
+      --accent: #2563eb;
+      --accent-hover: #1d4ed8;
+      --delivered: #059669;
+      --delivered-bg: #d1fae5;
+      --shipping: #d97706;
+      --shipping-bg: #fef3c7;
+      --border: #e5e2dc;
+      --radius: 16px;
+      --radius-sm: 10px;
+      --radius-lg: 20px;
+      --shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+      --shadow-hover: 0 8px 24px rgba(0, 0, 0, 0.08);
+      --danger: #dc2626;
+      --danger-bg: #fee2e2;
+      --nav-height: 64px;
+    }
+
+
+
+    *{
+      box-sizing:border-box;
+      margin:0;
+      padding:0;
+      font-family:Segoe UI, Arial, sans-serif;
+    }
+
+    body {
+      font-family: 'Plus Jakarta Sans', -apple-system, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      padding: 24px;
+      padding-bottom: calc(var(--nav-height) + 32px);
+      line-height: 1.5;
+    }
+
+    /* screens */
+
+    .screen{
+      display:none;
+      padding:20px;
+      padding-bottom:100px;
+    }
+
+    .active{
+      display:block;
+    }
+
+    /* header */
+
+    .header{
+      font-size:26px;
+      font-weight:600;
+      margin-bottom:20px;
+      color:#333;
+    }
+
+    /* search */
+
+    .search-bar{
+      width:100%;
+      padding:12px;
+      border-radius:10px;
+      border:none;
+      background:white;
+      box-shadow:0 2px 8px rgba(0,0,0,0.08);
+      margin-bottom:20px;
+      font-size:15px;
+    }
+
+    /* categories */
+
+    .categories{
+      display:flex;
+      gap:10px;
+      overflow-x:auto;
+      margin-bottom:20px;
+    }
+
+    .category{
+      padding:8px 16px;
+      background:white;
+      border-radius:20px;
+      font-size:14px;
+      box-shadow:0 2px 6px rgba(0,0,0,0.08);
+      cursor:pointer;
+      white-space:nowrap;
+    }
+
+    /* products */
+
+    .product-grid{
+      display:grid;
+      grid-template-columns:repeat(2,1fr);
+      gap:16px;
+    }
+
+    .product-card{
+      background:white;
+      border-radius:12px;
+      padding:12px;
+      box-shadow:0 4px 12px rgba(0,0,0,0.08);
+      cursor:pointer;
+      transition:0.2s;
+    }
+
+    .product-card:hover{
+      transform:translateY(-4px);
+    }
+
+    .product-img{
+      width:100%;
+      height:120px;
+      object-fit:cover;
+      border-radius:10px;
+      margin-bottom:10px;
+    }
+
+    .product-rating{
+      font-size:13px;
+      margin:4px 0;
+      color:#f59e0b;
+    }
+
+    .product-title{
+      font-size:14px;
+      margin-bottom:4px;
+    }
+
+    .product-price{
+      font-size:15px;
+      font-weight:600;
+      color:#2563eb;
+    }
+
+    /* product details */
+
+    .product-details{
+      background:white;
+      padding:20px;
+      border-radius:12px;
+      margin-top:20px;
+      box-shadow:0 4px 12px rgba(0,0,0,0.08);
+    }
+
+    .btn{
+      margin-top:15px;
+      padding:12px;
+      width:100%;
+      border:none;
+      border-radius:10px;
+      font-size:15px;
+      cursor:pointer;
+    }
+
+    .order-btn{
+      background:#2563eb;
+      color:white;
+    }
+
+    .rate-btn{
+      background:#10b981;
+      color:white;
+    }
+
+    /* orders */
+
+    .order-card{
+      background:white;
+      padding:15px;
+      border-radius:12px;
+      margin-bottom:15px;
+      box-shadow:0 3px 10px rgba(0,0,0,0.08);
+    }
+
+    .order-status{
+      font-size:13px;
+      color:#10b981;
+      margin-top:5px;
+    }
+
+    .order-card {
+      background: var(--surface);
+      border-radius: var(--radius);
+      border: 1px solid var(--border);
+      box-shadow: var(--shadow);
+      padding: 24px;
+      margin-bottom: 20px;
+      transition: box-shadow 0.2s ease, border-color 0.2s ease;
+    }
+    .order-card:hover {
+      box-shadow: var(--shadow-hover);
+      border-color: #d4d1cb;
+    }
+    .order-card__title {
+      font-size: 1.125rem;
+      font-weight: 600;
+      margin-bottom: 8px;
+      color: var(--text);
+    }
+    .order-status {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 0.8125rem;
+      font-weight: 500;
+      padding: 6px 12px;
+      border-radius: 999px;
+      margin-bottom: 20px;
+    }
+    .order-status--delivered {
+      background: var(--delivered-bg);
+      color: var(--delivered);
+    }
+    .order-status--shipping {
+      background: var(--shipping-bg);
+      color: var(--shipping);
+    }
+    .order-status::before {
+      content: '';
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: currentColor;
+    }
+    .comment-section {
+      margin-top: 16px;
+      padding-top: 16px;
+      border-top: 1px solid var(--border);
+    }
+    .comment-box {
+      width: 100%;
+      min-height: 88px;
+      padding: 14px 16px;
+      font-family: inherit;
+      font-size: 0.9375rem;
+      color: var(--text);
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      resize: vertical;
+      transition: border-color 0.2s ease, box-shadow 0.2s ease;
+      margin-bottom: 12px;
+    }
+    .comment-box::placeholder {
+      color: var(--text-muted);
+    }
+    .comment-box:hover {
+      border-color: #c9c6c0;
+    }
+    .comment-box:focus {
+      outline: none;
+      border-color: var(--accent);
+      box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.15);
+    }
+    .comment-section {
+      margin-top: 16px;
+      padding-top: 16px;
+      border-top: 1px solid var(--border);
+    }
+
+    .rate-btn {
+      width: 100%;
+      padding: 12px 20px;
+      font-family: inherit;
+      font-size: 0.9375rem;
+      font-weight: 600;
+      color: #fff;
+      background: var(--accent);
+      border: none;
+      border-radius: var(--radius-sm);
+      cursor: pointer;
+      transition: background 0.2s, transform 0.1s;
+    }
+    .rate-btn:hover { background: var(--accent-hover); }
+    .rate-btn:active { transform: scale(0.98); }
+
+    textarea{
+      width:100%;
+      padding:10px;
+      border-radius:8px;
+      border:1px solid #ddd;
+      margin-top:10px;
+      height:100px;
+    }
+
+    /* bottom nav */
+
+    .nav {
+      display: flex;
+      justify-content: space-around; /* evenly spaced */
+      background: #f5f5f5;
+      padding: 10px;
+      border-radius: 8px;
+    }
+
+    .nav__item {
+      text-decoration: none;
+      color: #333;
+      font-weight: 500;
+      padding: 10px 20px;
+      border-radius: 6px;
+      transition: background 0.3s, color 0.3s;
+    }
+
+    .nav__item:hover {
+      background: #ddd;
+      color: #000;
+    }
+
+    .nav__item.active {
+      background: #007bff;
+      color: #fff;
+    }
+
+    .report-box {
+      background: var(--surface);
+      border-radius: var(--radius);
+      border: 1px solid var(--border);
+      box-shadow: var(--shadow);
+      padding: 28px;
+    }
+    .report-box .form-group {
+      margin-bottom: 20px;
+    }
+    .report-box label {
+      display: block;
+      font-size: 0.875rem;
+      font-weight: 600;
+      color: var(--text);
+      margin-bottom: 8px;
+    }
+    .report-box .search-bar,
+    .report-box textarea {
+      width: 100%;
+      padding: 14px 16px;
+      font-family: inherit;
+      font-size: 0.9375rem;
+      color: var(--text);
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      transition: border-color 0.2s, box-shadow 0.2s;
+    }
+    .report-box .search-bar {
+      min-height: 48px;
+    }
+    .report-box textarea {
+      min-height: 120px;
+      resize: vertical;
+    }
+    .report-box .search-bar::placeholder,
+    .report-box textarea::placeholder {
+      color: var(--text-muted);
+    }
+    .report-box .search-bar:hover,
+    .report-box textarea:hover {
+      border-color: #c9c6c0;
+    }
+    .report-box .search-bar:focus,
+    .report-box textarea:focus {
+      outline: none;
+      border-color: var(--danger);
+      box-shadow: 0 0 0 3px rgba(220, 38, 38, 0.12);
+    }
+    .report-box .order-btn {
+      width: 100%;
+      padding: 14px 20px;
+      font-family: inherit;
+      font-size: 0.9375rem;
+      font-weight: 600;
+      color: #fff;
+      background: var(--danger);
+      border: none;
+      border-radius: var(--radius-sm);
+      cursor: pointer;
+      margin-top: 8px;
+      transition: background 0.2s, transform 0.1s;
+    }
+    .report-box .order-btn:hover {
+      background: #b91c1c;
+    }
+    .report-box .order-btn:active {
+      transform: scale(0.98);
+    }
+    .report-notice {
+      font-size: 0.8125rem;
+      color: var(--text-muted);
+      margin-top: 16px;
+      padding: 12px;
+      background: var(--bg);
+      border-radius: var(--radius-sm);
+    }
+
+    /* ========== BUYER SCREEN ========== */
+    .buyer-hero {
+      background: linear-gradient(135deg, #1e3a5f 0%, #2563eb 50%, #3b82f6 100%);
+      border-radius: var(--radius-lg);
+      padding: 28px;
+      margin-bottom: 24px;
+      color: #fff;
+      box-shadow: 0 12px 40px rgba(37, 99, 235, 0.35);
+    }
+    .buyer-hero__greeting {
+      font-size: 0.875rem;
+      font-weight: 500;
+      opacity: 0.9;
+      margin-bottom: 4px;
+    }
+    .buyer-hero__name {
+      font-size: 1.5rem;
+      font-weight: 700;
+      letter-spacing: -0.02em;
+    }
+    .buyer-stats {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 12px;
+      margin-bottom: 24px;
+    }
+    .stat-card {
+      background: var(--surface);
+      border-radius: var(--radius);
+      border: 1px solid var(--border);
+      padding: 18px;
+      text-align: center;
+      box-shadow: var(--shadow);
+      transition: box-shadow 0.2s, transform 0.1s;
+    }
+    .stat-card:hover {
+      box-shadow: var(--shadow-hover);
+      transform: translateY(-2px);
+    }
+    .stat-card__value {
+      font-size: 1.5rem;
+      font-weight: 700;
+      color: var(--text);
+      line-height: 1.2;
+    }
+    .stat-card__label {
+      font-size: 0.75rem;
+      color: var(--text-muted);
+      font-weight: 500;
+      margin-top: 4px;
+    }
+    .buyer-section {
+      margin-bottom: 24px;
+    }
+    .buyer-section__title {
+      font-size: 1rem;
+      font-weight: 600;
+      margin-bottom: 12px;
+      color: var(--text);
+    }
+    .quick-actions {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 12px;
+    }
+    .quick-action {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 16px;
+      text-decoration: none;
+      color: var(--text);
+      font-weight: 500;
+      font-size: 0.9375rem;
+      transition: border-color 0.2s, box-shadow 0.2s;
+    }
+    .quick-action:hover {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12);
+    }
+    .quick-action__icon {
+      width: 44px;
+      height: 44px;
+      border-radius: var(--radius-sm);
+      background: rgba(37, 99, 235, 0.12);
+      color: var(--accent);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.25rem;
+    }
+    .trust-badge {
+      background: var(--surface);
+      border-radius: var(--radius);
+      border: 1px solid var(--border);
+      padding: 20px;
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      box-shadow: var(--shadow);
+    }
+    .trust-badge__icon {
+      width: 48px;
+      height: 48px;
+      border-radius: 50%;
+      background: var(--delivered-bg);
+      color: var(--delivered);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.5rem;
+    }
+    .trust-badge__text strong { display: block; font-size: 1rem; margin-bottom: 2px; }
+    .trust-badge__text span { font-size: 0.8125rem; color: var(--text-muted); }
+
+  </style>
+</head>
+
+<body>
+
+<!-- Catalog Screen -->
+
+<div class="screen active" id="home">
+
+  <div class="header">Marketplace</div>
+
+  <input class="search-bar" placeholder="Search products...">
+
+  <div class="categories">
+    <div class="category">Electronics</div>
+    <div class="category">Clothes</div>
+    <div class="category">Home</div>
+    <div class="category">Sports</div>
+    <div class="category">Books</div>
+  </div>
+
+  <div class="product-grid">
+
+    <div class="product-card" data-name="Wireless Headphones">
+      <img class="product-img" src="headphones.jpg">
+
+      <div class="product-title">Wireless Headphones</div>
+
+      <div class="product-rating">
+        <span class="stars">⭐⭐⭐⭐</span>
+        <span class="rating-value">(4)</span>
+      </div>
+
+      <div class="product-price">$59</div>
+    </div>
+
+
+    <div class="product-card" data-name="Smart Watch">
+      <img class="product-img" src="smartWatch.jpg">
+
+      <div class="product-title">Smart Watch</div>
+
+      <div class="product-rating">
+        <span class="stars">⭐⭐⭐⭐⭐</span>
+        <span class="rating-value">(5)</span>
+      </div>
+
+      <div class="product-price">$120</div>
+    </div>
+
+
+    <div class="product-card" data-name="Sneakers">
+      <img class="product-img" src="sneakers.jpg">
+
+      <div class="product-title">Sneakers</div>
+
+      <div class="product-rating">
+        <span class="stars">⭐⭐⭐</span>
+        <span class="rating-value">(3)</span>
+      </div>
+
+      <div class="product-price">$75</div>
+    </div>
+
+
+    <div class="product-card" data-name="Laptop Bag">
+      <img class="product-img" src="laptopbag.jpg">
+
+      <div class="product-title">Laptop Bag</div>
+
+      <div class="product-rating">
+        <span class="stars">⭐⭐⭐⭐</span>
+        <span class="rating-value">(4)</span>
+      </div>
+
+      <div class="product-price">$40</div>
+    </div>
+
+  </div>
+
+  <div class="product-details">
+
+    <h3>Product Details</h3>
+    <p>High quality product with excellent reviews.</p>
+
+    <button class="btn order-btn">Place Order</button>
+    <button class="btn rate-btn">Rate Item</button>
+
+  </div>
+
+</div>
+
+<!-- Orders Screen -->
+
+<div class="screen" id="orders">
+  <h1 class="header">My Orders</h1>
+  <article class="order-card">
+    <h2 class="order-card__title">Wireless Headphones</h2>
+    <div class="order-status order-status--delivered">Delivered</div>
+    <div class="comment-section">
+      <textarea class="comment-box" placeholder="Add a comment or review for this order…" rows="3"></textarea>
+      <button type="button" class="rate-btn">Submit Comment</button>
+    </div>
+  </article>
+  <article class="order-card">
+    <h2 class="order-card__title">Smart Watch</h2>
+    <div class="order-status order-status--shipping">Shipping</div>
+    <div class="comment-section">
+      <textarea class="comment-box" placeholder="Add a comment or review for this order…" rows="3"></textarea>
+      <button type="button" class="rate-btn">Submit Comment</button>
+    </div>
+  </article>
+</div>
+<!-- Buyer -->
+<div class="screen" id="buyer">
+  <div class="buyer-hero">
+    <div class="buyer-hero__greeting">Welcome back</div>
+    <div class="buyer-hero__name">Alex</div>
+  </div>
+  <div class="buyer-stats">
+    <div class="stat-card">
+      <div class="stat-card__value">12</div>
+      <div class="stat-card__label">Orders</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-card__value">$847</div>
+      <div class="stat-card__label">Spent</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-card__value">5</div>
+      <div class="stat-card__label">Saved</div>
+    </div>
+  </div>
+  <div class="buyer-section">
+    <h2 class="buyer-section__title">Quick actions</h2>
+    <div class="quick-actions">
+      <a href="#" class="quick-action">
+        <span class="quick-action__icon">🔍</span>
+        <span>Track order</span>
+      </a>
+      <a href="#" class="quick-action">
+        <span class="quick-action__icon">❤️</span>
+        <span>Wishlist</span>
+      </a>
+      <a href="#" class="quick-action">
+        <span class="quick-action__icon">📍</span>
+        <span>Addresses</span>
+      </a>
+      <a href="#" class="quick-action">
+        <span class="quick-action__icon">💳</span>
+        <span>Payment</span>
+      </a>
+    </div>
+  </div>
+  <div class="trust-badge">
+    <div class="trust-badge__icon">✓</div>
+    <div class="trust-badge__text">
+      <strong>Verified buyer</strong>
+      <span>Your account is in good standing</span>
+    </div>
+  </div>
+</div>
+
+<!-- Report -->
+<div class="screen" id="report">
+  <h1 class="header">Report Seller</h1>
+  <div class="report-box">
+    <div class="form-group">
+      <label for="report-seller">Seller name</label>
+      <input type="text" id="report-seller" class="search-bar" placeholder="Enter seller name" autocomplete="off">
+    </div>
+    <div class="form-group">
+      <label for="report-reason">Reason</label>
+      <textarea id="report-reason" placeholder="Describe the issue (e.g. item not as described, late delivery, poor communication)…" rows="4"></textarea>
+    </div>
+    <button type="button" class="btn order-btn">Submit report</button>
+    <p class="report-notice">Reports are reviewed within 24–48 hours. We may contact you for more details.</p>
+  </div>
+</div>
+
+
+
+
+<!-- Bottom nav -->
+<nav class="nav">
+  <a href="#" class="nav__item active" data-screen="home">
+    🏠 Home
+  </a>
+  <a href="#" class="nav__item" data-screen="orders">
+    📦 Orders
+  </a>
+  <a href="#" class="nav__item" data-screen="buyer">
+    👤 Buyer
+  </a>
+  <a href="#" class="nav__item" data-screen="report">
+    ⚠️ Report
+  </a>
+</nav>
+<script src="buyer2.js"></script>
+</body>
+</html>
