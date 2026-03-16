@@ -389,6 +389,138 @@
       color: var(--text-muted);
     }
 
+
+    /* extra spacing between rating and image */
+    .rating-group {
+      margin-bottom: 20px;
+    }
+
+    .image-group {
+      margin-top: 8px;
+    }
+
+    /* rating display */
+    .rating-value {
+      margin-top: 4px;
+      font-size: 0.85rem;
+      color: var(--text-muted, #6b7280);
+    }
+
+    /* stars row (horizontal) */
+    .stars {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      user-select: none;
+    }
+
+    /* individual star */
+    .star {
+      position: relative;
+      width: 26px;
+      height: 26px;
+      display: inline-block;
+    }
+
+    .star-icon {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 24px;
+      line-height: 1;
+      pointer-events: none;
+      color: #fbbf24;
+      text-shadow: 0 1px 10px rgba(251, 191, 36, 0.15);
+    }
+
+    /* clickable halves */
+    .hit {
+      position: absolute;
+      top: 0;
+      bottom: 0;
+      width: 50%;
+      border: none;
+      background: transparent;
+      padding: 0;
+      cursor: pointer;
+    }
+    .hit-left { left: 0; }
+    .hit-right { right: 0; }
+
+    .hit:focus-visible {
+      outline: 2px solid rgba(56, 189, 248, 0.9);
+      outline-offset: 3px;
+      border-radius: 8px;
+    }
+
+    /* image upload UI */
+    .image-frame {
+      margin-top: 6px;
+      border: 1px dashed rgba(148, 163, 184, 0.6);
+      border-radius: 12px;
+      padding: 14px;
+      text-align: center;
+      position: relative;
+      background: rgba(15, 23, 42, 0.9);
+    }
+
+    .image-frame img {
+      max-width: 100%;
+      border-radius: 10px;
+      display: block;
+      margin: 0 auto 10px;
+    }
+
+    .placeholder {
+      margin-bottom: 10px;
+    }
+
+    .upload-icon {
+      font-size: 24px;
+      margin-bottom: 6px;
+    }
+
+    .upload-title {
+      font-size: 0.9rem;
+      font-weight: 600;
+      margin-bottom: 2px;
+    }
+
+    .upload-hint {
+      font-size: 0.8rem;
+      color: var(--text-muted, #9ca3af);
+    }
+
+    /* modern upload button */
+    .upload-button {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      padding: 8px 16px;
+      border-radius: 999px;
+      border: 1px solid rgba(56, 189, 248, 0.6);
+      background: rgba(15, 23, 42, 0.9);
+      color: #e5e7eb;
+      font-size: 0.8rem;
+      font-weight: 500;
+      cursor: pointer;
+      transition: background 0.15s, border-color 0.15s, transform 0.05s;
+    }
+
+    .upload-button:hover {
+      background: rgba(56, 189, 248, 0.08);
+      border-color: rgba(56, 189, 248, 0.9);
+    }
+
+    .upload-button:active {
+      transform: scale(0.97);
+    }
+
+
+
     .rating {
       color: #facc15;
     }
@@ -494,94 +626,146 @@
 
     /* Orders */
     .orders-container {
-      max-width: 820px;
-      margin: 8px auto 0;
-      border-radius: var(--radius-lg);
-      background: rgba(15, 23, 42, 0.98);
-      border: 1px solid var(--border-subtle);
-      box-shadow: var(--shadow-soft);
-      padding: 18px 18px 12px;
+      max-width: 960px;
+      margin: 12px auto 80px;
+      padding: 0 4px;
     }
 
+    /* filters */
     .order-filters {
       display: flex;
-      flex-wrap: wrap;
       gap: 8px;
-      margin-bottom: 12px;
-      font-size: 0.8rem;
+      margin-bottom: 18px;
+      flex-wrap: wrap;
     }
 
     .filter-pill {
-      padding: 5px 10px;
+      padding: 6px 12px;
       border-radius: 999px;
-      border: 1px solid rgba(148, 163, 184, 0.4);
-      background: rgba(15, 23, 42, 0.9);
-      cursor: pointer;
+      font-size: 0.8rem;
+      border: 1px solid rgba(148,163,184,0.35);
+      background: transparent;
       color: var(--text-muted);
+      cursor: pointer;
+      transition: background 0.15s, border-color 0.15s, color 0.15s;
     }
 
-    .filter-pill.active {
-      border-color: var(--accent);
+    .filter-pill.active,
+    .filter-pill:hover {
+      background: rgba(56,189,248,0.16);
+      border-color: rgba(56,189,248,0.8);
       color: var(--accent);
-      background: rgba(37, 99, 235, 0.3);
     }
 
+    /* empty state */
     .order-list-empty {
+      padding: 16px 14px;
+      border-radius: 12px;
+      border: 1px dashed rgba(148,163,184,0.4);
       font-size: 0.85rem;
       color: var(--text-muted);
-      padding: 10px 2px 4px;
+      background: rgba(15,23,42,0.7);
     }
 
-    .order-row {
-      display: grid;
-      grid-template-columns: 1.7fr 1fr 1fr 0.9fr;
-      gap: 8px;
+    /* cards created by renderOrders() */
+    .order-card {
+      background: rgba(15,23,42,0.98);
+      border-radius: 14px;
+      border: 1px solid rgba(148,163,184,0.35);
+      padding: 16px 18px;
+      margin-bottom: 14px;       /* more space between orders */
+      display: flex;
+      justify-content: space-between;
       align-items: center;
-      padding: 8px 4px;
-      border-radius: 11px;
+      gap: 16px;
+      box-shadow: 0 12px 30px rgba(15,23,42,0.7);
+    }
+
+    .order-main h3 {
+      margin: 0 0 4px;
+      font-size: 0.98rem;
+    }
+
+    .order-main p {
+      margin: 0 0 6px;
       font-size: 0.82rem;
-      border: 1px solid rgba(148, 163, 184, 0.25);
-      background: rgba(15, 23, 42, 0.85);
-      margin-bottom: 8px;
-    }
-
-    .order-title {
-      font-weight: 500;
-    }
-
-    .badge-status {
-      font-size: 0.72rem;
-      padding: 3px 7px;
-      border-radius: 999px;
-    }
-
-    .badge-status.paid {
-      background: rgba(22, 163, 74, 0.2);
-      color: #4ade80;
-      border: 1px solid rgba(74, 222, 128, 0.6);
-    }
-
-    .badge-status.pending {
-      background: rgba(250, 204, 21, 0.18);
-      color: #fde047;
-      border: 1px solid rgba(250, 204, 21, 0.6);
-    }
-
-    .badge-status.refunded {
-      background: rgba(59, 130, 246, 0.18);
-      color: #93c5fd;
-      border: 1px solid rgba(59, 130, 246, 0.7);
-    }
-
-    .order-amount {
-      font-weight: 500;
-    }
-
-    .order-date {
       color: var(--text-muted);
-      font-size: 0.78rem;
     }
 
+    .order-status {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      padding: 4px 9px;
+      border-radius: 999px;
+      font-size: 0.75rem;
+      background: rgba(148,163,184,0.18);
+    }
+
+    .order-status-pending {
+      background: rgba(250, 204, 21, 0.18);  /* amber */
+      color: #facc15;
+    }
+
+    .order-status-preparing {
+      background: rgba(56, 189, 248, 0.18);  /* sky */
+      color: #38bdf8;
+    }
+
+    .order-status-delivered {
+      background: rgba(34, 197, 94, 0.18);   /* green */
+      color: #22c55e;
+    }
+
+    /* you can also add specific colors based on status class:
+       .order-status-pending, .order-status-preparing, etc. */
+
+    /* actions area (select + flag button) */
+    .order-actions {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    .order-actions select {
+      padding: 6px 9px;
+      border-radius: 999px;
+      border: 1px solid rgba(148,163,184,0.4);
+      background: rgba(15,23,42,0.9);
+      color: var(--text);
+      font-size: 0.8rem;
+    }
+
+    /* modern flag button – matches JS onclick="flagBuyer(...)" */
+    .flag-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 6px 12px;
+      border-radius: 999px;
+      border: 1px solid rgba(248,113,113,0.8);
+      background: rgba(248,113,113,0.08);
+      color: #fecaca;
+      font-size: 0.78rem;
+      font-weight: 500;
+      cursor: pointer;
+      transition: background 0.15s, border-color 0.15s, transform 0.05s;
+    }
+
+    .flag-btn::before {
+      content: "⚑";
+      font-size: 0.9rem;
+    }
+
+    .flag-btn:hover {
+      background: rgba(248,113,113,0.18);
+      border-color: rgba(248,113,113,1);
+    }
+
+    .flag-btn:active {
+      transform: scale(0.97);
+    }
     /* Profile */
     .profile-container {
       max-width: 580px;
@@ -910,13 +1094,7 @@
       </div>
 
       <div>
-        <div class="form-group">
-          <label>Initial rating <span>Optional starting value (1–5)</span></label>
-          <input id="rating" type="number" step="0.1" max="5" min="1" placeholder="4.8">
-        </div>
-        <div class="form-group">
-          <label>Image URL <span>Shown in your product card</span></label>
-          <input id="imageUrl" placeholder="https://example.com/image.jpg">
+        <div id="root"></div>
         </div>
         <div class="form-group">
           <label>Tags <span>Comma-separated keywords</span></label>
@@ -950,23 +1128,16 @@
 
   <div class="orders-container">
     <div class="order-filters">
-      <div class="filter-pill active">All</div>
-      <div class="filter-pill">Paid</div>
-      <div class="filter-pill">Pending</div>
-      <div class="filter-pill">Refunded</div>
+      <button class="filter-pill active" data-status="All">All</button>
+      <button class="filter-pill" data-status="Pending">Pending</button>
+      <button class="filter-pill" data-status="Preparing">Preparing</button>
+      <button class="filter-pill" data-status="Delivered">Delivered</button>
     </div>
 
     <div id="ordersList">
-      <!-- Your JS can append .order-row items here -->
-      <div class="order-list-empty">You have no orders yet. Once buyers purchase your items, they’ll appear here.</div>
-      <!-- Example structure for JS:
-      <div class="order-row">
-        <div class="order-title">Wireless Headphones</div>
-        <div class="order-date">Mar 18 • #ORD-1029</div>
-        <div class="order-amount">$79.99</div>
-        <div class="badge-status paid">Paid</div>
+      <div class="order-list-empty">
+        You have no orders yet. Once buyers purchase your items, they’ll appear here.
       </div>
-      -->
     </div>
   </div>
 </div>
@@ -1068,7 +1239,14 @@
   </div>
 </div>
 
-<!-- JS (your existing logic) -->
-<script src="app.js"></script>
+<!-- React UMD builds -->
+<script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
+<script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+
+<!-- Babel so we can write JSX in app.js -->
+<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+<!-- Your JS file with JSX + the code you pasted -->
+<script type="text/babel" src="app.js"></script>
 </body>
 </html>

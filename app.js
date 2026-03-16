@@ -1,5 +1,130 @@
 // ---------- DATA ----------
 
+// ---------- REACT PRODUCT FORM ----------
+const { useState } = React;
+
+function ProductForm() {
+  const [rating, setRating] = useState(0);
+  const [hover, setHover] = useState(null);
+  const [image, setImage] = useState("");
+
+  const value = hover ?? rating;
+  const clampHalf = (v) => Math.max(0, Math.min(5, Math.round(v * 2) / 2));
+  const setValue = (v) => setRating(clampHalf(v));
+
+  const handleImage = (file) => {
+    if (file instanceof File) {
+      setImage(URL.createObjectURL(file));
+    }
+  };
+
+  const handleFileChange = (e) => handleImage(e.target.files?.[0]);
+  const handleDrop = (e) => {
+    e.preventDefault();
+    handleImage(e.dataTransfer.files?.[0]);
+  };
+  const handleDragOver = (e) => e.preventDefault();
+
+  const onStarsKeyDown = (e) => {
+    if (e.key === "ArrowRight") { e.preventDefault(); setValue(rating + 0.5); }
+    if (e.key === "ArrowLeft")  { e.preventDefault(); setValue(rating - 0.5); }
+    if (e.key === "Home")       { e.preventDefault(); setValue(0); }
+    if (e.key === "End")        { e.preventDefault(); setValue(5); }
+  };
+
+  return (
+    <div>
+      {/* Rating block */}
+      <div className="form-group rating-group">
+        <label>Initial rating</label>
+
+        <div
+          className="stars"
+          role="slider"
+          aria-label="Initial rating"
+          aria-valuemin={0}
+          aria-valuemax={5}
+          aria-valuenow={rating}
+          aria-valuetext={`${rating} out of 5`}
+          tabIndex={0}
+          onKeyDown={onStarsKeyDown}
+          onMouseLeave={() => setHover(null)}
+        >
+          {[...Array(5)].map((_, i) => {
+            const starValue = i + 1;
+            const isFull = value >= starValue;
+            const isHalf = !isFull && value >= starValue - 0.5;
+            const icon = isFull ? "★" : isHalf ? "⯨" : "☆";
+
+            return (
+              <div key={starValue} className="star">
+                <button
+                  type="button"
+                  className="hit hit-left"
+                  aria-label={
+                    starValue === 1 ? "Set rating to 0" : `Set rating to ${starValue - 0.5}`
+                  }
+                  onMouseEnter={() => setHover(starValue === 1 ? 0 : starValue - 0.5)}
+                  onFocus={() => setHover(starValue === 1 ? 0 : starValue - 0.5)}
+                  onBlur={() => setHover(null)}
+                  onClick={() => setValue(starValue === 1 ? 0 : starValue - 0.5)}
+                />
+                <button
+                  type="button"
+                  className="hit hit-right"
+                  aria-label={`Set rating to ${starValue}`}
+                  onMouseEnter={() => setHover(starValue)}
+                  onFocus={() => setHover(starValue)}
+                  onBlur={() => setHover(null)}
+                  onClick={() => setValue(starValue)}
+                />
+                <span className="star-icon" aria-hidden="true">
+                  {icon}
+                </span>
+              </div>
+            );
+          })}
+        </div>
+
+        <p className="rating-value">{rating} / 5</p>
+      </div>
+
+      {/* Image block */}
+      <div className="form-group image-group">
+        <label>Product image</label>
+
+        <div
+          className="image-frame"
+          onDrop={handleDrop}
+          onDragOver={handleDragOver}
+        >
+          {image ? (
+            <img src={image} alt="preview" />
+          ) : (
+            <div className="placeholder">
+              <div className="upload-icon">📷</div>
+              <div className="upload-title">Upload a product image</div>
+              <div className="upload-hint">
+                Drag & drop, or click the button below
+              </div>
+            </div>
+          )}
+
+          <label className="upload-button">
+            <span>Choose image</span>
+            <input
+              type="file"
+              accept="image/*"
+              onChange={handleFileChange}
+              hidden
+            />
+          </label>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // Product data (enriched with category, inventory, orders)
 let products = [
   {
@@ -144,13 +269,30 @@ function addProduct() {
 
 // ---------- ORDERS ----------
 
+let activeOrderFilter = "All"; // All | Pending | Preparing | Delivered | Paid | Refunded
+
 function renderOrders() {
   const container = document.getElementById("ordersList");
   if (!container) return;
 
   container.innerHTML = "";
 
-  orders.forEach((o, i) => {
+  // filter based on activeOrderFilter
+  const visible = orders.filter(o => {
+    if (activeOrderFilter === "All") return true;
+    return o.status === activeOrderFilter;
+  });
+
+  if (!visible.length) {
+    container.innerHTML = `
+      <div class="order-list-empty">
+        No orders match this filter.
+      </div>
+    `;
+    return;
+  }
+
+  visible.forEach((o, i) => {
     container.innerHTML += `
       <div class="order-card">
         <div class="order-main">
@@ -209,3 +351,24 @@ if (searchInput) {
 
 renderProducts();
 renderOrders();
+
+
+document.querySelectorAll(".order-filters .filter-pill").forEach(btn => {
+  btn.addEventListener("click", () => {
+    const status = btn.getAttribute("data-status") || "All";
+    activeOrderFilter = status;
+
+    // update active class
+    document.querySelectorAll(".order-filters .filter-pill").forEach(b =>
+      b.classList.remove("active")
+    );
+    btn.classList.add("active");
+
+    renderOrders();
+  });
+});
+
+const rootEl = document.getElementById("root");
+if (rootEl) {
+  ReactDOM.createRoot(rootEl).render(<ProductForm />);
+}
