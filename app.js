@@ -1,6 +1,3 @@
-// ---------- DATA ----------
-
-// ---------- REACT PRODUCT FORM ----------
 const { useState } = React;
 
 function ProductForm() {
@@ -13,9 +10,7 @@ function ProductForm() {
   const setValue = (v) => setRating(clampHalf(v));
 
   const handleImage = (file) => {
-    if (file instanceof File) {
-      setImage(URL.createObjectURL(file));
-    }
+    if (file instanceof File) setImage(URL.createObjectURL(file));
   };
 
   const handleFileChange = (e) => handleImage(e.target.files?.[0]);
@@ -26,18 +21,28 @@ function ProductForm() {
   const handleDragOver = (e) => e.preventDefault();
 
   const onStarsKeyDown = (e) => {
-    if (e.key === "ArrowRight") { e.preventDefault(); setValue(rating + 0.5); }
-    if (e.key === "ArrowLeft")  { e.preventDefault(); setValue(rating - 0.5); }
-    if (e.key === "Home")       { e.preventDefault(); setValue(0); }
-    if (e.key === "End")        { e.preventDefault(); setValue(5); }
+    if (e.key === "ArrowRight") {
+      e.preventDefault();
+      setValue(rating + 0.5);
+    }
+    if (e.key === "ArrowLeft") {
+      e.preventDefault();
+      setValue(rating - 0.5);
+    }
+    if (e.key === "Home") {
+      e.preventDefault();
+      setValue(0);
+    }
+    if (e.key === "End") {
+      e.preventDefault();
+      setValue(5);
+    }
   };
 
   return (
     <div>
-      {/* Rating block */}
       <div className="form-group rating-group">
         <label>Initial rating</label>
-
         <div
           className="stars"
           role="slider"
@@ -61,9 +66,7 @@ function ProductForm() {
                 <button
                   type="button"
                   className="hit hit-left"
-                  aria-label={
-                    starValue === 1 ? "Set rating to 0" : `Set rating to ${starValue - 0.5}`
-                  }
+                  aria-label={starValue === 1 ? "Set rating to 0" : `Set rating to ${starValue - 0.5}`}
                   onMouseEnter={() => setHover(starValue === 1 ? 0 : starValue - 0.5)}
                   onFocus={() => setHover(starValue === 1 ? 0 : starValue - 0.5)}
                   onBlur={() => setHover(null)}
@@ -85,39 +88,24 @@ function ProductForm() {
             );
           })}
         </div>
-
         <p className="rating-value">{rating} / 5</p>
       </div>
 
-      {/* Image block */}
       <div className="form-group image-group">
         <label>Product image</label>
-
-        <div
-          className="image-frame"
-          onDrop={handleDrop}
-          onDragOver={handleDragOver}
-        >
+        <div className="image-frame" onDrop={handleDrop} onDragOver={handleDragOver}>
           {image ? (
             <img src={image} alt="preview" />
           ) : (
             <div className="placeholder">
               <div className="upload-icon">📷</div>
               <div className="upload-title">Upload a product image</div>
-              <div className="upload-hint">
-                Drag & drop, or click the button below
-              </div>
+              <div className="upload-hint">Drag & drop, or click the button below</div>
             </div>
           )}
-
           <label className="upload-button">
             <span>Choose image</span>
-            <input
-              type="file"
-              accept="image/*"
-              onChange={handleFileChange}
-              hidden
-            />
+            <input type="file" accept="image/*" onChange={handleFileChange} hidden />
           </label>
         </div>
       </div>
@@ -125,7 +113,6 @@ function ProductForm() {
   );
 }
 
-// Product data (enriched with category, inventory, orders)
 let products = [
   {
     name: "Wireless Headphones",
@@ -156,43 +143,18 @@ let products = [
   }
 ];
 
-// Orders data (can be rendered with richer UI later via CSS)
 let orders = [
   { product: "Headphones", buyer: "Ali", status: "Pending" },
   { product: "Smart Watch", buyer: "Sara", status: "Preparing" }
 ];
 
+let activeOrderFilter = "All";
 
-// ---------- SCREEN NAVIGATION ----------
-
-function showScreen(id, btn) {
-  // Hide all screens
-  document.querySelectorAll(".screen").forEach(s => s.classList.remove("active"));
-
-  // Show selected screen
-  const target = document.getElementById(id);
-  if (target) target.classList.add("active");
-
-  // Update nav button styling
-  document.querySelectorAll(".nav-btn").forEach(n => n.classList.remove("active"));
-  if (btn) btn.classList.add("active");
-
-  // Render content for specific screens
-  if (id === "home") renderProducts();
-  if (id === "orders") renderOrders();
-}
-
-
-// ---------- PRODUCTS (HOME) ----------
-
-// Render product cards (optionally from a filtered list)
 function renderProducts(list = products) {
   const grid = document.getElementById("productGrid");
   if (!grid) return;
-
-  grid.innerHTML = ""; // clear before rendering
-
-  list.forEach(p => {
+  grid.innerHTML = "";
+  list.forEach((p) => {
     const stars = "⭐".repeat(Math.round(p.rating));
     grid.innerHTML += `
       <div class="card">
@@ -216,91 +178,22 @@ function renderProducts(list = products) {
   });
 }
 
-// Add new product from the Add Item form
-function addProduct() {
-  const nameEl = document.getElementById("name");
-  const priceEl = document.getElementById("price");
-  const ratingEl = document.getElementById("rating");
-  const categoryEl = document.getElementById("category");
-
-  if (!nameEl || !priceEl || !categoryEl) return;
-
-  const name = nameEl.value.trim();
-  const price = parseFloat(priceEl.value);
-  const rating = parseFloat(ratingEl.value || "5");
-  const category = categoryEl.value || "General";
-
-  if (!name || isNaN(price)) {
-    alert("Please enter at least a product name and valid price.");
-    return;
-  }
-
-  const product = {
-    name,
-    price,
-    rating: isNaN(rating) ? 5 : rating,
-    image: "https://images.unsplash.com/photo-1518441902110-3c6f91e2d7d0?w=500",
-    category,
-    inventory: 0,
-    orders: 0
-  };
-
-  products.push(product);
-
-  // Clear form
-  nameEl.value = "";
-  priceEl.value = "";
-  if (ratingEl) ratingEl.value = "";
-  categoryEl.value = categoryEl.options[0]?.value || "";
-
-  // Reset search and re-render full list
-  const searchInput = document.querySelector(".search-bar input");
-  if (searchInput) searchInput.value = "";
-
-  renderProducts();
-
-  // Go back to home, highlight the Home nav button
-  const homeBtn = document.querySelector(".nav-btn");
-  showScreen("home", homeBtn);
-
-  alert("Product added");
-}
-
-
-// ---------- ORDERS ----------
-
-let activeOrderFilter = "All"; // All | Pending | Preparing | Delivered | Paid | Refunded
-
 function renderOrders() {
   const container = document.getElementById("ordersList");
   if (!container) return;
-
   container.innerHTML = "";
-
-  // filter based on activeOrderFilter
-  const visible = orders.filter(o => {
-    if (activeOrderFilter === "All") return true;
-    return o.status === activeOrderFilter;
-  });
-
+  const visible = orders.filter((o) => activeOrderFilter === "All" || o.status === activeOrderFilter);
   if (!visible.length) {
-    container.innerHTML = `
-      <div class="order-list-empty">
-        No orders match this filter.
-      </div>
-    `;
+    container.innerHTML = `<div class="order-list-empty">No orders match this filter.</div>`;
     return;
   }
-
   visible.forEach((o, i) => {
     container.innerHTML += `
       <div class="order-card">
         <div class="order-main">
           <h3>${o.product}</h3>
           <p>Buyer: <strong>${o.buyer}</strong></p>
-          <span class="order-status order-status-${o.status.toLowerCase()}">
-            ${o.status}
-          </span>
+          <span class="order-status order-status-${o.status.toLowerCase()}">${o.status}</span>
         </div>
         <div class="order-actions">
           <select onchange="changeStatus(${i}, this.value)">
@@ -317,58 +210,120 @@ function renderOrders() {
 
 function changeStatus(i, status) {
   orders[i].status = status;
-  renderOrders(); // refresh to show updated status
+  renderOrders();
 }
 
 function flagBuyer(name) {
   alert(name + " flagged");
 }
 
+function addProduct() {
+  const nameEl = document.getElementById("name");
+  const priceEl = document.getElementById("price");
+  const ratingEl = document.getElementById("rating");
+  const categoryEl = document.getElementById("category");
+  if (!nameEl || !priceEl || !categoryEl) return;
 
-// ---------- SEARCH (HOME) ----------
+  const name = nameEl.value.trim();
+  const price = parseFloat(priceEl.value);
+  const rating = parseFloat(ratingEl?.value || "5");
+  const category = categoryEl.value || "General";
 
-const searchInput = document.querySelector(".search-bar input");
-if (searchInput) {
+  if (!name || isNaN(price)) {
+    alert("Please enter at least a product name and valid price.");
+    return;
+  }
+
+  products.push({
+    name,
+    price,
+    rating: isNaN(rating) ? 5 : rating,
+    image: "https://images.unsplash.com/photo-1518441902110-3c6f91e2d7d0?w=500",
+    category,
+    inventory: 0,
+    orders: 0
+  });
+
+  nameEl.value = "";
+  priceEl.value = "";
+  if (ratingEl) ratingEl.value = "";
+  categoryEl.value = categoryEl.options[0]?.value || "";
+
+  const searchInput = document.getElementById("homeSearchInput");
+  if (searchInput) searchInput.value = "";
+
+  renderProducts();
+  showScreen("home", document.querySelector('.nav-btn[onclick*="home"]'));
+  alert("Product added");
+}
+
+function showScreen(id, btn) {
+  document.querySelectorAll(".screen").forEach((s) => s.classList.remove("active"));
+  const target = document.getElementById(id);
+  if (target) target.classList.add("active");
+
+  document.querySelectorAll(".nav-btn").forEach((n) => n.classList.remove("active"));
+  if (btn) btn.classList.add("active");
+
+  if (id === "home") renderProducts();
+  if (id === "orders") renderOrders();
+}
+
+function attachNavHandlers() {
+  document.querySelectorAll(".nav-btn").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const id = btn.getAttribute("onclick")?.match(/showScreen\('([^']+)'/)?.[1];
+      if (id) showScreen(id, btn);
+    });
+  });
+}
+
+function attachSearchHandler() {
+  const searchInput = document.getElementById("homeSearchInput");
+  if (!searchInput) return;
   searchInput.addEventListener("input", () => {
     const query = searchInput.value.trim().toLowerCase();
-    if (!query) {
-      renderProducts();
-      return;
-    }
+    if (!query) return renderProducts();
+    renderProducts(products.filter((p) => p.name.toLowerCase().includes(query) || (p.category || "").toLowerCase().includes(query)));
+  });
+}
 
-    const filtered = products.filter(p => {
-      const name = p.name.toLowerCase();
-      const category = (p.category || "").toLowerCase();
-      return name.includes(query) || category.includes(query);
+function attachOrderFilterHandlers() {
+  document.querySelectorAll(".order-filters .filter-pill").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      activeOrderFilter = btn.getAttribute("data-status") || "All";
+      document.querySelectorAll(".order-filters .filter-pill").forEach((b) => b.classList.remove("active"));
+      btn.classList.add("active");
+      renderOrders();
     });
-
-    renderProducts(filtered);
   });
 }
 
+function mountApp() {
+  attachNavHandlers();
+  attachSearchHandler();
+  attachOrderFilterHandlers();
+  renderProducts();
+  renderOrders();
+  showScreen("home", document.querySelector('.nav-btn[onclick*="home"]'));
 
-// ---------- INITIAL RENDER ----------
-
-renderProducts();
-renderOrders();
-
-
-document.querySelectorAll(".order-filters .filter-pill").forEach(btn => {
-  btn.addEventListener("click", () => {
-    const status = btn.getAttribute("data-status") || "All";
-    activeOrderFilter = status;
-
-    // update active class
-    document.querySelectorAll(".order-filters .filter-pill").forEach(b =>
-      b.classList.remove("active")
-    );
-    btn.classList.add("active");
-
-    renderOrders();
-  });
-});
-
-const rootEl = document.getElementById("root");
-if (rootEl) {
-  ReactDOM.createRoot(rootEl).render(<ProductForm />);
+  const rootEl = document.getElementById("root");
+  if (rootEl) ReactDOM.createRoot(rootEl).render(<ProductForm />);
 }
+
+document.addEventListener("DOMContentLoaded", mountApp);
+if (document.readyState !== "loading") mountApp();
+
+window.changeStatus = changeStatus;
+window.flagBuyer = flagBuyer;
+window.addProduct = addProduct;
+window.showScreen = showScreen;
+window.renderProducts = renderProducts;
+window.renderOrders = renderOrders;
+window.setActiveOrderFilter = function (status) {
+  activeOrderFilter = status || "All";
+  document.querySelectorAll(".order-filters .filter-pill").forEach((b) => b.classList.remove("active"));
+  const activeBtn = document.querySelector(`.order-filters .filter-pill[data-status="${activeOrderFilter}"]`);
+  if (activeBtn) activeBtn.classList.add("active");
+  renderOrders();
+};

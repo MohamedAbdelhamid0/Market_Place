@@ -21,7 +21,6 @@ navItems.forEach((item) => {
   });
 });
 
-// ---------- REACT HOME + ORDERS ----------
 const { useEffect, useMemo, useState } = React;
 
 const STORAGE_KEY = "buyerApp.orders.v1";
@@ -80,6 +79,52 @@ const DEFAULT_PRODUCTS = [
   { id: "p4", name: "Laptop Bag", price: 40, avgRating: 4.0, category: "Home", image: "laptopbag.jpg" }
 ];
 
+const OFFERS = [
+  { title: "Summer Sale", text: "Up to 40% off trending picks", cta: "Shop deals", bg: "linear-gradient(135deg, #2563eb, #4f46e5)" },
+  { title: "Free Delivery", text: "Selected items ship free today", cta: "Browse offers", bg: "linear-gradient(135deg, #0f766e, #14b8a6)" },
+  { title: "New Arrivals", text: "Fresh products added this week", cta: "See new items", bg: "linear-gradient(135deg, #7c3aed, #ec4899)" }
+];
+
+function Carousel() {
+  const [index, setIndex] = useState(0);
+
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setIndex((current) => (current + 1) % OFFERS.length);
+    }, 3500);
+    return () => clearInterval(timer);
+  }, []);
+
+  return (
+    <section className="carousel" aria-label="Offers carousel">
+      <div className="carousel-track" style={{ transform: `translateX(-${index * 100}%)` }}>
+        {OFFERS.map((offer, i) => (
+          <article className="carousel-slide" key={offer.title}>
+            <div className="carousel-copy">
+              <span className="product-badge">Offer {i + 1}</span>
+              <h3>{offer.title}</h3>
+              <p>{offer.text}</p>
+              <div className="carousel-cta">{offer.cta} →</div>
+            </div>
+            <div className="carousel-visual" style={{ background: offer.bg }} />
+          </article>
+        ))}
+      </div>
+      <div className="carousel-dots" aria-label="Carousel navigation">
+        {OFFERS.map((offer, i) => (
+          <button
+            key={offer.title}
+            type="button"
+            className={`carousel-dot ${i === index ? "active" : ""}`}
+            onClick={() => setIndex(i)}
+            aria-label={`Go to offer ${i + 1}`}
+          />
+        ))}
+      </div>
+    </section>
+  );
+}
+
 function StarRating({ rating = 0, onRate }) {
   const [hover, setHover] = React.useState(null);
   const value = Math.max(0, Math.min(5, Number(hover ?? rating) || 0));
@@ -126,14 +171,11 @@ function HomeScreen({ products, onPlaceOrder }) {
     acc[product.id] = 0;
     return acc;
   }, {});
-  //const [ratings, setRatings] = useState(() => loadRatings());
   const [ratings, setRatings] = useState(initialRatings);
   const [query, setQuery] = useState("");
   const [category, setCategory] = useState("All");
   const [selectedId, setSelectedId] = useState(products[0]?.id ?? "");
-  const [view, setView] = useState("list"); // list | details
-
-
+  const [view, setView] = useState("list");
 
   useEffect(() => {
     if (!selectedId && products[0]?.id) setSelectedId(products[0].id);
@@ -167,13 +209,7 @@ function HomeScreen({ products, onPlaceOrder }) {
           <button
             type="button"
             className="btn"
-            style={{
-              width: "auto",
-              padding: "10px 14px",
-              background: "#e5e7eb",
-              marginTop: 0,
-              marginBottom: 14,
-            }}
+            style={{ width: "auto", padding: "10px 14px", background: "#e5e7eb", marginTop: 0, marginBottom: 14 }}
             onClick={() => setView("list")}
           >
             ← Back
@@ -184,48 +220,21 @@ function HomeScreen({ products, onPlaceOrder }) {
               <div className="header" style={{ marginBottom: 12, color: "var(--text)" }}>
                 {selected.name}
               </div>
-
-              <img
-                src={selected.image}
-                alt={selected.name}
-                style={{
-                  width: "100%",
-                  height: 220,
-                  objectFit: "cover",
-                  borderRadius: 14,
-                  marginBottom: 14,
-                }}
-              />
-
+              <img src={selected.image} alt={selected.name} style={{ width: "100%", height: 220, objectFit: "cover", borderRadius: 14, marginBottom: 14 }} />
               <p style={{ color: "var(--text-muted)" }}>
                 Category: <strong style={{ color: "var(--text)" }}>{selected.category}</strong>
               </p>
-              <p style={{ marginTop: 6 }}>
-                Price: <strong>{money(selected.price)}</strong>
-              </p>
-              <p style={{ marginTop: 6 }}>
-                Product rating:
-                <span className="stars">{stars(selected.avgRating)}</span>
-              </p>
-
+              <p style={{ marginTop: 6 }}><strong>{money(selected.price)}</strong></p>
+              <p style={{ marginTop: 6 }}>Product rating: <span className="stars">{stars(selected.avgRating)}</span></p>
               <StarRating
                 rating={ratings[selected.id] ?? 0}
                 onRate={(n) => {
                   const next = { ...ratings, [selected.id]: n };
                   setRatings(next);
                   saveRatings(next);
-
                 }}
               />
-
-              <button
-                className="btn order-btn"
-                type="button"
-                onClick={() => {
-                  onPlaceOrder(selected);
-                  showScreen("orders");
-                }}
-              >
+              <button className="btn order-btn" type="button" onClick={() => { onPlaceOrder(selected); showScreen("orders"); }}>
                 Place Order
               </button>
             </>
@@ -235,15 +244,22 @@ function HomeScreen({ products, onPlaceOrder }) {
         </div>
       ) : (
         <>
+          <div className="buyer-hero">
+            <div className="buyer-hero__greeting">Welcome back</div>
+            <div className="buyer-hero__name">Find today’s best offers</div>
+          </div>
+
+          <Carousel />
+
+          <div className="buyer-stats">
+            <div className="stat-card"><div className="stat-card__value" id="buyer-orders-count">0</div><div className="stat-card__label">Orders</div></div>
+            <div className="stat-card"><div className="stat-card__value" id="buyer-total-payment">$0</div><div className="stat-card__label">Total spent</div></div>
+            <div className="stat-card"><div className="stat-card__value">4.8</div><div className="stat-card__label">Average rating</div></div>
+          </div>
+
           <div className="header">Marketplace</div>
 
-          <input
-            className="search-bar"
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            placeholder="Search products..."
-            aria-label="Search products"
-          />
+          <input className="search-bar" value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search products..." aria-label="Search products" />
 
           <div className="categories" role="tablist" aria-label="Categories">
             {categories.map((c) => (
@@ -252,11 +268,7 @@ function HomeScreen({ products, onPlaceOrder }) {
                 type="button"
                 className="category"
                 onClick={() => setCategory(c)}
-                style={{
-                  border: "none",
-                  outline: "none",
-                  background: c === category ? "#eaf0ff" : "white",
-                }}
+                style={{ border: "none", outline: "none", background: c === category ? "#eaf0ff" : "white" }}
                 aria-pressed={c === category}
               >
                 {c}
@@ -269,10 +281,7 @@ function HomeScreen({ products, onPlaceOrder }) {
               <div
                 key={p.id}
                 className="product-card"
-                onClick={() => {
-                  setSelectedId(p.id);
-                  setView("details");
-                }}
+                onClick={() => { setSelectedId(p.id); setView("details"); }}
                 role="button"
                 tabIndex={0}
                 onKeyDown={(e) => {
@@ -282,10 +291,11 @@ function HomeScreen({ products, onPlaceOrder }) {
                   }
                 }}
               >
+                <div className="product-badge">{p.category}</div>
                 <img className="product-img" src={p.image} alt={p.name} />
                 <div className="product-title">{p.name}</div>
                 <div className="product-rating">
-                  <span className="stars">{stars(p.avgRating)}</span>{" "}
+                  <span className="stars">{stars(p.avgRating)}</span>
                   <span className="rating-value">({Number(p.avgRating || 0).toFixed(1)})</span>
                 </div>
                 <div className="product-price">{money(p.price)}</div>
@@ -293,11 +303,7 @@ function HomeScreen({ products, onPlaceOrder }) {
             ))}
           </div>
 
-          {!filtered.length ? (
-            <div className="product-details" style={{ marginTop: 16 }}>
-              No products match your search.
-            </div>
-          ) : null}
+          {!filtered.length ? <div className="product-details" style={{ marginTop: 16 }}>No products match your search.</div> : null}
         </>
       )}
     </div>
@@ -306,7 +312,7 @@ function HomeScreen({ products, onPlaceOrder }) {
 
 function OrdersScreen() {
   const [orders, setOrders] = useState(() => loadOrders());
-  const [filter, setFilter] = useState("All"); // All | Processing | Shipping | Delivered
+  const [filter, setFilter] = useState("All");
 
   useEffect(() => {
     const onChanged = () => setOrders(loadOrders());
@@ -342,11 +348,7 @@ function OrdersScreen() {
             type="button"
             className="category"
             onClick={() => setFilter(f)}
-            style={{
-              border: "none",
-              outline: "none",
-              background: f === filter ? "#eaf0ff" : "white",
-            }}
+            style={{ border: "none", outline: "none", background: f === filter ? "#eaf0ff" : "white" }}
             aria-pressed={f === filter}
           >
             {f}
@@ -357,9 +359,7 @@ function OrdersScreen() {
       {!filtered.length ? (
         <div className="order-card">
           <div className="order-card__title">No orders yet</div>
-          <div style={{ color: "var(--text-muted)" }}>
-            Place an order from Home and it will show up here.
-          </div>
+          <div style={{ color: "var(--text-muted)" }}>Place an order from Home and it will show up here.</div>
         </div>
       ) : (
         filtered.map((o) => {
@@ -368,7 +368,7 @@ function OrdersScreen() {
               ? "order-status--delivered"
               : o.status === "Shipping"
                 ? "order-status--shipping"
-                : "";
+                : "order-status--processing";
 
           return (
             <article key={o.id} className="order-card">
@@ -381,14 +381,7 @@ function OrdersScreen() {
                   <select
                     value={o.status}
                     onChange={(e) => updateOrder(o.id, { status: e.target.value })}
-                    style={{
-                      width: "100%",
-                      marginTop: 6,
-                      padding: "10px 12px",
-                      borderRadius: 10,
-                      border: "1px solid var(--border)",
-                      background: "var(--bg)",
-                    }}
+                    style={{ width: "100%", marginTop: 6, padding: "10px 12px", borderRadius: 10, border: "1px solid var(--border)", background: "var(--bg)" }}
                   >
                     <option value="Processing">Processing</option>
                     <option value="Shipping">Shipping</option>
@@ -404,22 +397,8 @@ function OrdersScreen() {
                     value={o.comment || ""}
                     onChange={(e) => updateOrder(o.id, { comment: e.target.value })}
                   />
-                  <button
-                    type="button"
-                    className="rate-btn"
-                    onClick={() => alert("Comment saved")}
-                  >
-                    Submit Comment
-                  </button>
-
-                  <button
-                    type="button"
-                    className="btn"
-                    style={{ background: "#ef4444", color: "white" }}
-                    onClick={() => removeOrder(o.id)}
-                  >
-                    Remove Order
-                  </button>
+                  <button type="button" className="rate-btn" onClick={() => alert("Comment saved")}>Submit Comment</button>
+                  <button type="button" className="btn" style={{ background: "#ef4444", color: "white" }} onClick={() => removeOrder(o.id)}>Remove Order</button>
                 </div>
               </div>
             </article>
@@ -436,7 +415,6 @@ function mount() {
   if (!homeRoot || !ordersRoot) return;
 
   const products = DEFAULT_PRODUCTS;
-  const productsById = Object.fromEntries(products.map((p) => [p.id, p]));
 
   function updateBuyerTotals() {
     const orders = loadOrders();
@@ -466,12 +444,9 @@ function mount() {
     alert("Order placed successfully!");
   }
 
-  ReactDOM.createRoot(homeRoot).render(
-    <HomeScreen products={products} onPlaceOrder={placeOrder} />
-  );
+  ReactDOM.createRoot(homeRoot).render(<HomeScreen products={products} onPlaceOrder={placeOrder} />);
   ReactDOM.createRoot(ordersRoot).render(<OrdersScreen />);
 
-  // Initial totals + keep Buyer screen totals in sync
   updateBuyerTotals();
   window.addEventListener("orders:changed", updateBuyerTotals);
 }
