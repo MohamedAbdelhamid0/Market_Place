@@ -1,185 +1,102 @@
--- =========================
--- PRODUCTS
--- =========================
-CREATE TABLE products (
-                          id INT AUTO_INCREMENT PRIMARY KEY,
-                          title VARCHAR(200) NOT NULL,
-                          price DECIMAL(10,2),
-                          image VARCHAR(255),
-                          category VARCHAR(100),
-                          rating FLOAT DEFAULT 0,
-                          inventory INT DEFAULT 0,
-                          sold_products INT DEFAULT 0,
-                          store_id INT,
-                          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+-- Seller.sql
+-- Seller-side SQL objects and ready-to-use queries for marketplace
+-- Run Buyer.sql first.
 
-                          FOREIGN KEY (store_id) REFERENCES store(store_owner)
-);
-
+USE marketplace;
 
 -- =========================
--- SELLERS
+-- VIEWS
 -- =========================
-CREATE TABLE seller (
-                        id INT AUTO_INCREMENT PRIMARY KEY,
-                        name VARCHAR(100),
-                        email VARCHAR(100) UNIQUE,
-                        support_email VARCHAR(100) UNIQUE,
-                        password VARCHAR(255),
-                        location VARCHAR(255),
-                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-);
 
-
--- =========================
--- STORES
--- =========================
-CREATE TABLE store (
-                       store_owner INT PRIMARY KEY,
-                       store_owner_name VARCHAR(100),
-                       name VARCHAR(100),
-                       bio TEXT,
-                       location VARCHAR(255),
-                       rating FLOAT DEFAULT 0,
-                       amount_sold INT DEFAULT 0,
-                       available_inventory INT DEFAULT 0,
-                       created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-
-                       FOREIGN KEY (store_owner) REFERENCES seller(id),
-                       FOREIGN KEY (store_owner_name) REFERENCES seller(name),
-                       FOREIGN KEY (amount_sold) REFERENCES products (sold_products),
-                       FOREIGN KEY (available_inventory) REFERENCES products (inventory)
-);
-
-CREATE VIEW store_stats AS
+-- Product inventory + sales summary per seller
+CREATE OR REPLACE VIEW v_seller_product_stats AS
 SELECT
-    s.store_owner,
-    s.name AS store_name,
-    SUM(p.inventory) AS sum_available_inventory,
-    SUM(p.sold_products) AS sum_amount_sold
-FROM store s
-         LEFT JOIN products p ON s.store_owner = p.store_id
-GROUP BY s.store_owner, s.name;
+    s.id AS seller_id,
+    s.business_name,
+    p.id AS product_id,
+    p.title,
+    c.name AS category,
+    p.stock_quantity,
+    p.delivery_estimate_days,
+    p.price,
+    COALESCE(SUM(oi.quantity), 0) AS total_units_sold,
+    COALESCE(SUM(oi.subtotal), 0) AS total_revenue
+FROM sellers s
+JOIN products p ON p.seller_id = s.id
+JOIN categories c ON c.id = p.category_id
+LEFT JOIN order_items oi ON oi.product_id = p.id
+LEFT JOIN orders o ON o.id = oi.order_id
+    AND o.status IN ('Delivered', 'Shipping', 'Preparing', 'Processing', 'Placed')
+GROUP BY s.id, s.business_name, p.id, p.title, c.name, p.stock_quantity, p.delivery_estimate_days, p.price;
 
--- =========================
--- BUYERS
--- =========================
-CREATE TABLE buyer (
-                       id INT AUTO_INCREMENT PRIMARY KEY,
-                       name VARCHAR(100),
-                       email VARCHAR(100) UNIQUE,
-                       password VARCHAR(255),
-                       location VARCHAR(255),
-                       created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-);
-
-
--- =========================
--- ORDERS
--- =========================
-CREATE TABLE orders (
-                        id INT AUTO_INCREMENT PRIMARY KEY,
-                        product_id INT,
-                        buyer_id INT,
-                        status VARCHAR(50) DEFAULT 'Pending',
-                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-
-                        FOREIGN KEY (product_id) REFERENCES products(id),
-                        FOREIGN KEY (buyer_id) REFERENCES buyer(id)
-);
-
-
--- =========================
--- ADDITIONS FOR BUYER APP (app-screens.js)
--- =========================
--- These tables/columns support: order comments, product ratings, search, and order flow
-
--- =========================
--- ORDER REVIEWS (Submit Comment + Rate flow)
--- =========================
--- Stores buyer comments and 1-5 ratings submitted via "Submit Comment" button on order cards
-CREATE TABLE order_reviews (
-                               id INT AUTO_INCREMENT PRIMARY KEY,
-                               order_id INT NOT NULL,
-                               buyer_id INT NOT NULL,
-                               rating TINYINT NOT NULL CHECK (rating >= 1 AND rating <= 5),
-                               comment TEXT,
-                               created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-
-                               FOREIGN KEY (order_id) REFERENCES orders(id) ON DELETE CASCADE,
-                               FOREIGN KEY (buyer_id) REFERENCES buyer(id) ON DELETE CASCADE,
-                               UNIQUE KEY unique_review_per_order (order_id)
-);
-
--- =========================
--- ORDER COMMENTS (alternative: add to orders if 1:1)
--- =========================
--- Optional: add comment column directly to orders if you prefer denormalization
--- ALTER TABLE orders ADD COLUMN buyer_comment TEXT;
--- ALTER TABLE orders ADD COLUMN buyer_rating TINYINT CHECK (buyer_rating >= 1 AND buyer_rating <= 5);
-
--- =========================
--- PRODUCT SEARCH INDEX
--- =========================
--- Speeds up product search by title (used when filtering product cards)
-CREATE INDEX idx_products_title ON products(title);
-CREATE INDEX idx_products_category ON products(category);
-
--- =========================
--- ORDERS LOOKUP INDEXES
--- =========================
-CREATE INDEX idx_orders_buyer_id ON orders(buyer_id);
-CREATE INDEX idx_orders_status ON orders(status);
-CREATE INDEX idx_orders_created ON orders(created_at DESC);
-
--- =========================
--- PRODUCT RATING AGGREGATE (optional trigger)
--- =========================
--- Keep products.rating in sync with order_reviews (via orders -> product_id)
--- Run periodically or use a trigger
-/*
-CREATE TRIGGER update_product_rating AFTER INSERT ON order_reviews
-FOR EACH ROW
-BEGIN
-  UPDATE products p
-  SET p.rating = (
-    SELECT AVG(r.rating) FROM order_reviews r
-    JOIN orders o ON r.order_id = o.id
-    WHERE o.product_id = p.id
-  )
-  WHERE p.id = (SELECT product_id FROM orders WHERE id = NEW.order_id);
-END;
-*/
-
--- =========================
--- SAMPLE QUERIES FOR APP INTEGRATION
--- =========================
-
--- Get orders for a buyer (with product title, status) - for My Orders screen
-/*
-SELECT o.id, o.status, o.created_at, p.title, p.price, p.image
+-- Seller order inbox
+CREATE OR REPLACE VIEW v_seller_orders AS
+SELECT
+    o.id AS order_id,
+    o.seller_id,
+    s.business_name,
+    o.buyer_id,
+    b.full_name AS buyer_name,
+    o.status,
+    o.total_amount,
+    o.delivery_address,
+    o.created_at,
+    o.updated_at
 FROM orders o
-JOIN products p ON o.product_id = p.id
-WHERE o.buyer_id = ?
-ORDER BY o.created_at DESC;
-*/
+JOIN sellers s ON s.id = o.seller_id
+JOIN buyers b ON b.id = o.buyer_id;
 
--- Insert new order (place order flow)
-/*
-INSERT INTO orders (product_id, buyer_id, status) VALUES (?, ?, 'Processing');
-*/
+-- =========================
+-- STORED PROCEDURES
+-- =========================
 
--- Insert order review (Submit Comment + rate flow)
-/*
-INSERT INTO order_reviews (order_id, buyer_id, rating, comment)
-VALUES (?, ?, ?, ?)
-ON DUPLICATE KEY UPDATE rating = VALUES(rating), comment = VALUES(comment);
-*/
+-- Seller updates status of an order they own
+DROP PROCEDURE IF EXISTS sp_seller_update_order_status;
+CREATE PROCEDURE sp_seller_update_order_status(
+    IN p_seller_id INT,
+    IN p_order_id INT,
+    IN p_new_status VARCHAR(20)
+)
+UPDATE orders
+SET status = p_new_status
+WHERE id = p_order_id
+  AND seller_id = p_seller_id
+  AND p_new_status IN ('Processing', 'Preparing', 'Shipping', 'Delivered', 'Cancelled');
 
--- Get products for home/search (product cards)
-/*
-SELECT id, title, price, image, category, rating
-FROM products
-WHERE title LIKE CONCAT('%', ?, '%')
-ORDER BY rating DESC;
-*/
+-- Seller flags buyer
+DROP PROCEDURE IF EXISTS sp_seller_flag_buyer;
+CREATE PROCEDURE sp_seller_flag_buyer(
+    IN p_order_id INT,
+    IN p_buyer_id INT,
+    IN p_seller_id INT,
+    IN p_reason VARCHAR(30),
+    IN p_details TEXT
+)
+INSERT INTO buyer_flags (order_id, buyer_id, seller_id, reason, details)
+VALUES (p_order_id, p_buyer_id, p_seller_id, p_reason, p_details);
+
+-- =========================
+-- SELLER QUERIES
+-- =========================
+
+-- 1) List orders received by a seller
+-- SELECT order_id, buyer_name, status, total_amount, created_at
+-- FROM v_seller_orders
+-- WHERE seller_id = ?
+-- ORDER BY created_at DESC;
+
+-- 2) Change order status
+-- CALL sp_seller_update_order_status(?, ?, 'Shipping');
+
+-- 3) Add new product listing
+-- INSERT INTO products (seller_id, category_id, title, description, image_url, price, stock_quantity, delivery_estimate_days)
+-- VALUES (?, ?, ?, ?, ?, ?, ?, ?);
+
+-- 4) See product stats
+-- SELECT *
+-- FROM v_seller_product_stats
+-- WHERE seller_id = ?
+-- ORDER BY total_revenue DESC;
+
+-- 5) Flag buyer
+-- CALL sp_seller_flag_buyer(?, ?, ?, 'RefusedPackage', 'Buyer refused to receive package on arrival.');

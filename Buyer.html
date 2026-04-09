@@ -662,15 +662,15 @@
 <div class="screen" id="buyer">
   <div class="buyer-hero">
     <div class="buyer-hero__greeting">Welcome back</div>
-    <div class="buyer-hero__name">Alex</div>
+    <div class="buyer-hero__name" id="buyer-profile-name">Buyer</div>
   </div>
   <div class="buyer-stats">
     <div class="stat-card">
-      <div class="stat-card__value" id="buyer-orders-count">12</div>
+      <div class="stat-card__value" data-buyer-orders-count>0</div>
       <div class="stat-card__label">Orders</div>
     </div>
     <div class="stat-card">
-      <div class="stat-card__value" id="buyer-total-payment">$847</div>
+      <div class="stat-card__value" data-buyer-total-payment>$0</div>
       <div class="stat-card__label">Spent</div>
     </div>
     <div class="stat-card">
@@ -713,8 +713,14 @@
   <h1 class="header">Report Seller</h1>
   <div class="report-box">
     <div class="form-group">
-      <label for="report-seller">Seller name</label>
-      <input type="text" id="report-seller" class="search-bar" placeholder="Enter seller name" autocomplete="off">
+      <label for="report-order">Order</label>
+      <select id="report-order" class="search-bar" aria-label="Select order to report">
+        <option value="">Loading your orders...</option>
+      </select>
+    </div>
+    <div class="form-group">
+      <label for="report-seller">Seller</label>
+      <input type="text" id="report-seller" class="search-bar" placeholder="Select an order first" readonly>
     </div>
     <div class="form-group">
       <label for="report-reason">Reason</label>

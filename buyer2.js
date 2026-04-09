@@ -1,8 +1,5 @@
-// Keep your existing screen navigation working (bottom nav toggles `.active` screens).
 const screens = document.querySelectorAll(".screen");
 const navItems = document.querySelectorAll(".nav__item");
-
-var productRating = 4;
 
 function showScreen(id) {
   screens.forEach((screen) => screen.classList.remove("active"));
@@ -23,40 +20,44 @@ navItems.forEach((item) => {
 
 const { useEffect, useMemo, useState } = React;
 
-const STORAGE_KEY = "buyerApp.orders.v1";
-const STORAGE_RATINGS_KEY = "buyerApp.ratings.v1";
+const API_BASE = "http://localhost:4000";
+const SESSION_KEY = "marketplace.auth.user";
 
-function loadOrders() {
+function getSessionUser() {
   try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (!raw) return [];
+    const raw = localStorage.getItem(SESSION_KEY);
+    if (!raw) return null;
     const parsed = JSON.parse(raw);
-    if (!Array.isArray(parsed)) return [];
+    if (!parsed || typeof parsed !== "object") return null;
     return parsed;
   } catch {
-    return [];
+    return null;
   }
 }
 
-function saveOrders(next) {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
-  window.dispatchEvent(new CustomEvent("orders:changed"));
+const currentUser = getSessionUser();
+if (!currentUser || currentUser.role !== "buyer") {
+  window.location.href = "Login.html";
 }
 
-function loadRatings() {
-  try {
-    const raw = localStorage.getItem(STORAGE_RATINGS_KEY);
-    if (!raw) return {};
-    const parsed = JSON.parse(raw);
-    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return {};
-    return parsed;
-  } catch {
-    return {};
-  }
+const buyerDisplayName = String(currentUser?.name || "Buyer");
+
+async function apiGet(path) {
+  const response = await fetch(`${API_BASE}${path}`);
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(data.message || "Request failed");
+  return data;
 }
 
-function saveRatings(next) {
-  localStorage.setItem(STORAGE_RATINGS_KEY, JSON.stringify(next));
+async function apiSend(path, method, payload) {
+  const response = await fetch(`${API_BASE}${path}`, {
+    method,
+    headers: { "Content-Type": "application/json" },
+    body: payload ? JSON.stringify(payload) : undefined
+  });
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(data.message || "Request failed");
+  return data;
 }
 
 function money(n) {
@@ -71,13 +72,6 @@ function stars(rating) {
   const half = r - full >= 0.5;
   return "★".repeat(full) + (half ? "⯨" : "") + "☆".repeat(5 - full - (half ? 1 : 0));
 }
-
-const DEFAULT_PRODUCTS = [
-  { id: "p1", name: "Wireless Headphones", price: 59, avgRating: 4.0, category: "Electronics", image: "headphones.jpg" },
-  { id: "p2", name: "Smart Watch", price: 120, avgRating: 5.0, category: "Electronics", image: "smartWatch.jpg" },
-  { id: "p3", name: "Sneakers", price: 75, avgRating: 3.0, category: "Clothes", image: "sneakers.jpg" },
-  { id: "p4", name: "Laptop Bag", price: 40, avgRating: 4.0, category: "Home", image: "laptopbag.jpg" }
-];
 
 const OFFERS = [
   { title: "Summer Sale", text: "Up to 40% off trending picks", cta: "Shop deals", bg: "linear-gradient(135deg, #2563eb, #4f46e5)" },
@@ -126,7 +120,7 @@ function Carousel() {
 }
 
 function StarRating({ rating = 0, onRate }) {
-  const [hover, setHover] = React.useState(null);
+  const [hover, setHover] = useState(null);
   const value = Math.max(0, Math.min(5, Number(hover ?? rating) || 0));
   const starsArr = Array.from({ length: 5 }, (_, i) => i + 1);
 
@@ -161,7 +155,7 @@ function StarRating({ rating = 0, onRate }) {
   );
 }
 
-function HomeScreen({ products, onPlaceOrder }) {
+function HomeScreen({ products, onPlaceOrder, onRateProduct, buyerName }) {
   const categories = useMemo(() => {
     const set = new Set(products.map((p) => p.category).filter(Boolean));
     return ["All", ...Array.from(set)];
@@ -171,6 +165,7 @@ function HomeScreen({ products, onPlaceOrder }) {
     acc[product.id] = 0;
     return acc;
   }, {});
+
   const [ratings, setRatings] = useState(initialRatings);
   const [query, setQuery] = useState("");
   const [category, setCategory] = useState("All");
@@ -184,10 +179,7 @@ function HomeScreen({ products, onPlaceOrder }) {
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
     return products.filter((p) => {
-      const matchesQuery =
-        !q ||
-        p.name.toLowerCase().includes(q) ||
-        (p.category || "").toLowerCase().includes(q);
+      const matchesQuery = !q || p.name.toLowerCase().includes(q) || (p.category || "").toLowerCase().includes(q);
       const matchesCategory = category === "All" || p.category === category;
       return matchesQuery && matchesCategory;
     });
@@ -197,10 +189,6 @@ function HomeScreen({ products, onPlaceOrder }) {
     () => products.find((p) => p.id === selectedId) ?? filtered[0] ?? null,
     [products, selectedId, filtered]
   );
-
-  useEffect(() => {
-    if (view === "details" && !selected) setView("list");
-  }, [view, selected]);
 
   return (
     <div>
@@ -217,43 +205,54 @@ function HomeScreen({ products, onPlaceOrder }) {
 
           {selected ? (
             <>
-              <div className="header" style={{ marginBottom: 12, color: "var(--text)" }}>
-                {selected.name}
-              </div>
-              <img src={selected.image} alt={selected.name} style={{ width: "100%", height: 220, objectFit: "cover", borderRadius: 14, marginBottom: 14 }} />
-              <p style={{ color: "var(--text-muted)" }}>
-                Category: <strong style={{ color: "var(--text)" }}>{selected.category}</strong>
-              </p>
+              <div className="header" style={{ marginBottom: 12, color: "var(--text)" }}>{selected.name}</div>
+              <img src={selected.image || ""} alt={selected.name} style={{ width: "100%", height: 220, objectFit: "cover", borderRadius: 14, marginBottom: 14 }} />
+              <p style={{ color: "var(--text-muted)" }}>Category: <strong style={{ color: "var(--text)" }}>{selected.category}</strong></p>
               <p style={{ marginTop: 6 }}><strong>{money(selected.price)}</strong></p>
               <p style={{ marginTop: 6 }}>Product rating: <span className="stars">{stars(selected.avgRating)}</span></p>
+              <p style={{ marginTop: 6, color: "var(--text-muted)" }}>Delivery estimate: {selected.deliveryEstimateDays || 0} day(s)</p>
               <StarRating
                 rating={ratings[selected.id] ?? 0}
-                onRate={(n) => {
+                onRate={async (n) => {
                   const next = { ...ratings, [selected.id]: n };
                   setRatings(next);
-                  saveRatings(next);
+                  try {
+                    await onRateProduct(selected, n);
+                    alert("Rating submitted.");
+                  } catch (err) {
+                    alert(err.message || "Failed to submit rating");
+                  }
                 }}
               />
-              <button className="btn order-btn" type="button" onClick={() => { onPlaceOrder(selected); showScreen("orders"); }}>
+              <button
+                className="btn order-btn"
+                type="button"
+                onClick={async () => {
+                  try {
+                    await onPlaceOrder(selected);
+                    showScreen("orders");
+                  } catch (err) {
+                    alert(err.message || "Order failed");
+                  }
+                }}
+              >
                 Place Order
               </button>
             </>
-          ) : (
-            <p>No product selected.</p>
-          )}
+          ) : <p>No product selected.</p>}
         </div>
       ) : (
         <>
           <div className="buyer-hero">
             <div className="buyer-hero__greeting">Welcome back</div>
-            <div className="buyer-hero__name">Find today’s best offers</div>
+            <div className="buyer-hero__name">{buyerName}</div>
           </div>
 
           <Carousel />
 
           <div className="buyer-stats">
-            <div className="stat-card"><div className="stat-card__value" id="buyer-orders-count">0</div><div className="stat-card__label">Orders</div></div>
-            <div className="stat-card"><div className="stat-card__value" id="buyer-total-payment">$0</div><div className="stat-card__label">Total spent</div></div>
+            <div className="stat-card"><div className="stat-card__value" data-buyer-orders-count>0</div><div className="stat-card__label">Orders</div></div>
+            <div className="stat-card"><div className="stat-card__value" data-buyer-total-payment>$0</div><div className="stat-card__label">Total spent</div></div>
             <div className="stat-card"><div className="stat-card__value">4.8</div><div className="stat-card__label">Average rating</div></div>
           </div>
 
@@ -292,7 +291,7 @@ function HomeScreen({ products, onPlaceOrder }) {
                 }}
               >
                 <div className="product-badge">{p.category}</div>
-                <img className="product-img" src={p.image} alt={p.name} />
+                <img className="product-img" src={p.image || ""} alt={p.name} />
                 <div className="product-title">{p.name}</div>
                 <div className="product-rating">
                   <span className="stars">{stars(p.avgRating)}</span>
@@ -310,31 +309,53 @@ function HomeScreen({ products, onPlaceOrder }) {
   );
 }
 
-function OrdersScreen() {
-  const [orders, setOrders] = useState(() => loadOrders());
+function OrdersScreen({ buyerId, refreshSignal, onTotalsChanged }) {
+  const [orders, setOrders] = useState([]);
   const [filter, setFilter] = useState("All");
+  const [loading, setLoading] = useState(false);
+
+  async function fetchOrders() {
+    setLoading(true);
+    try {
+      const data = await apiGet(`/api/buyer/${buyerId}/orders`);
+      setOrders(Array.isArray(data.orders) ? data.orders : []);
+      onTotalsChanged(Array.isArray(data.orders) ? data.orders : []);
+    } catch (err) {
+      console.error(err);
+      alert(err.message || "Failed to load orders");
+    } finally {
+      setLoading(false);
+    }
+  }
 
   useEffect(() => {
-    const onChanged = () => setOrders(loadOrders());
-    window.addEventListener("orders:changed", onChanged);
-    return () => window.removeEventListener("orders:changed", onChanged);
-  }, []);
+    fetchOrders();
+  }, [refreshSignal]);
 
   const filtered = useMemo(() => {
     if (filter === "All") return orders;
     return orders.filter((o) => o.status === filter);
   }, [orders, filter]);
 
-  function updateOrder(id, patch) {
-    const next = orders.map((o) => (o.id === id ? { ...o, ...patch } : o));
-    setOrders(next);
-    saveOrders(next);
+  async function saveComment(order) {
+    try {
+      await apiSend(`/api/buyer/orders/${order.id}/comment`, "POST", {
+        buyerId,
+        comment: order.comment || ""
+      });
+      alert("Comment saved");
+    } catch (err) {
+      alert(err.message || "Failed to save comment");
+    }
   }
 
-  function removeOrder(id) {
-    const next = orders.filter((o) => o.id !== id);
-    setOrders(next);
-    saveOrders(next);
+  async function removeOrder(id) {
+    try {
+      await apiSend(`/api/buyer/orders/${id}?buyerId=${buyerId}`, "DELETE");
+      await fetchOrders();
+    } catch (err) {
+      alert(err.message || "Failed to remove order");
+    }
   }
 
   return (
@@ -342,7 +363,7 @@ function OrdersScreen() {
       <h1 className="header">My Orders</h1>
 
       <div className="categories" aria-label="Order filters">
-        {["All", "Processing", "Shipping", "Delivered"].map((f) => (
+        {["All", "Placed", "Processing", "Preparing", "Shipping", "Delivered", "Cancelled"].map((f) => (
           <button
             key={f}
             type="button"
@@ -356,55 +377,45 @@ function OrdersScreen() {
         ))}
       </div>
 
-      {!filtered.length ? (
+      {loading ? <div className="order-card">Loading orders...</div> : null}
+
+      {!loading && !filtered.length ? (
         <div className="order-card">
           <div className="order-card__title">No orders yet</div>
           <div style={{ color: "var(--text-muted)" }}>Place an order from Home and it will show up here.</div>
         </div>
-      ) : (
-        filtered.map((o) => {
-          const statusClass =
-            o.status === "Delivered"
-              ? "order-status--delivered"
-              : o.status === "Shipping"
-                ? "order-status--shipping"
-                : "order-status--processing";
+      ) : null}
 
-          return (
-            <article key={o.id} className="order-card">
-              <h2 className="order-card__title">{o.productName}</h2>
-              <div className={`order-status ${statusClass}`}>{o.status}</div>
+      {!loading && filtered.map((o) => {
+        const statusClass =
+          o.status === "Delivered"
+            ? "order-status--delivered"
+            : o.status === "Shipping"
+              ? "order-status--shipping"
+              : "order-status--processing";
 
-              <div style={{ display: "grid", gap: 10 }}>
-                <label style={{ fontSize: 13, color: "var(--text-muted)" }}>
-                  Status
-                  <select
-                    value={o.status}
-                    onChange={(e) => updateOrder(o.id, { status: e.target.value })}
-                    style={{ width: "100%", marginTop: 6, padding: "10px 12px", borderRadius: 10, border: "1px solid var(--border)", background: "var(--bg)" }}
-                  >
-                    <option value="Processing">Processing</option>
-                    <option value="Shipping">Shipping</option>
-                    <option value="Delivered">Delivered</option>
-                  </select>
-                </label>
+        return (
+          <article key={o.id} className="order-card">
+            <h2 className="order-card__title">{o.productName}</h2>
+            <div className={`order-status ${statusClass}`}>{o.status}</div>
 
-                <div className="comment-section">
-                  <textarea
-                    className="comment-box"
-                    placeholder="Add a comment or review for this order…"
-                    rows={3}
-                    value={o.comment || ""}
-                    onChange={(e) => updateOrder(o.id, { comment: e.target.value })}
-                  />
-                  <button type="button" className="rate-btn" onClick={() => alert("Comment saved")}>Submit Comment</button>
-                  <button type="button" className="btn" style={{ background: "#ef4444", color: "white" }} onClick={() => removeOrder(o.id)}>Remove Order</button>
-                </div>
-              </div>
-            </article>
-          );
-        })
-      )}
+            <div className="comment-section">
+              <textarea
+                className="comment-box"
+                placeholder="Add a comment or review for this order…"
+                rows={3}
+                value={o.comment || ""}
+                onChange={(e) => {
+                  const next = orders.map((item) => item.id === o.id ? { ...item, comment: e.target.value } : item);
+                  setOrders(next);
+                }}
+              />
+              <button type="button" className="rate-btn" onClick={() => saveComment(o)}>Submit Comment</button>
+              <button type="button" className="btn" style={{ background: "#ef4444", color: "white" }} onClick={() => removeOrder(o.id)}>Remove Order</button>
+            </div>
+          </article>
+        );
+      })}
     </div>
   );
 }
@@ -414,41 +425,190 @@ function mount() {
   const ordersRoot = document.getElementById("orders-root");
   if (!homeRoot || !ordersRoot) return;
 
-  const products = DEFAULT_PRODUCTS;
-
-  function updateBuyerTotals() {
-    const orders = loadOrders();
-    const total = orders.reduce((sum, o) => sum + (Number(o.productPrice) || 0), 0);
-
-    const totalEl = document.getElementById("buyer-total-payment");
-    if (totalEl) totalEl.textContent = money(total);
-
-    const countEl = document.getElementById("buyer-orders-count");
-    if (countEl) countEl.textContent = String(orders.length);
+  const buyerId = currentUser?.id;
+  if (!buyerId) {
+    window.location.href = "Login.html";
+    return;
   }
 
-  function placeOrder(product) {
-    const current = loadOrders();
-    const next = [
-      {
-        id: `o_${Date.now()}_${Math.random().toString(16).slice(2)}`,
-        productId: product.id,
-        productName: product.name,
-        productPrice: product.price,
-        status: "Processing",
-        comment: ""
-      },
-      ...current
-    ];
-    saveOrders(next);
+  let rerenderOrders = 0;
+
+  function hydrateBuyerIdentity() {
+    const profileName = document.getElementById("buyer-profile-name");
+    if (profileName) profileName.textContent = buyerDisplayName;
+  }
+
+  function updateBuyerTotalsFromOrders(orders) {
+    const total = (orders || []).reduce((sum, o) => sum + ((Number(o.productPrice) || 0) * (Number(o.quantity) || 1)), 0);
+    const count = String((orders || []).length);
+    const spent = money(total);
+
+    document.querySelectorAll("[data-buyer-total-payment]").forEach((el) => {
+      el.textContent = spent;
+    });
+
+    document.querySelectorAll("[data-buyer-orders-count]").forEach((el) => {
+      el.textContent = count;
+    });
+  }
+
+  async function loadCatalog() {
+    const data = await apiGet("/api/catalog");
+    return Array.isArray(data.products) ? data.products : [];
+  }
+
+  async function placeOrder(product) {
+    await apiSend("/api/orders", "POST", {
+      buyerId,
+      productId: product.id,
+      quantity: 1
+    });
+    rerenderOrders += 1;
+    renderOrdersScreen();
     alert("Order placed successfully!");
   }
 
-  ReactDOM.createRoot(homeRoot).render(<HomeScreen products={products} onPlaceOrder={placeOrder} />);
-  ReactDOM.createRoot(ordersRoot).render(<OrdersScreen />);
+  async function rateProduct(product, rating) {
+    const ordersData = await apiGet(`/api/buyer/${buyerId}/orders`);
+    const matchingOrder = (ordersData.orders || []).find((o) => Number(o.productId) === Number(product.id));
+    if (!matchingOrder) {
+      throw new Error("Place an order for this item before rating it.");
+    }
 
-  updateBuyerTotals();
-  window.addEventListener("orders:changed", updateBuyerTotals);
+    await apiSend(`/api/buyer/orders/${matchingOrder.id}/review`, "POST", {
+      orderId: matchingOrder.id,
+      productId: product.id,
+      buyerId,
+      rating,
+      reviewComment: ""
+    });
+  }
+
+  function attachReportForm() {
+    const submitButton = document.querySelector("#report .order-btn");
+    const orderSelect = document.getElementById("report-order");
+    const sellerInput = document.getElementById("report-seller");
+    const reasonInput = document.getElementById("report-reason");
+    if (!submitButton || !orderSelect || !sellerInput || !reasonInput) return;
+
+    let reportableOrders = [];
+
+    function renderOrderOptions(orders) {
+      reportableOrders = Array.isArray(orders) ? orders : [];
+      orderSelect.innerHTML = "";
+
+      if (!reportableOrders.length) {
+        const option = document.createElement("option");
+        option.value = "";
+        option.textContent = "No eligible orders available";
+        orderSelect.appendChild(option);
+        orderSelect.disabled = true;
+        sellerInput.value = "No seller available";
+        submitButton.disabled = true;
+        return;
+      }
+
+      const placeholder = document.createElement("option");
+      placeholder.value = "";
+      placeholder.textContent = "Select an order";
+      orderSelect.appendChild(placeholder);
+
+      reportableOrders.forEach((order) => {
+        const option = document.createElement("option");
+        option.value = String(order.id);
+        option.textContent = `#${order.id} - ${order.productName} (${order.status})`;
+        orderSelect.appendChild(option);
+      });
+
+      orderSelect.disabled = false;
+      submitButton.disabled = false;
+      sellerInput.value = "";
+    }
+
+    async function loadReportableOrders() {
+      try {
+        const ordersData = await apiGet(`/api/buyer/${buyerId}/orders`);
+        const activeOrders = (ordersData.orders || []).filter((o) => o.status !== "Cancelled");
+        renderOrderOptions(activeOrders);
+      } catch (err) {
+        orderSelect.innerHTML = '<option value="">Failed to load orders</option>';
+        orderSelect.disabled = true;
+        submitButton.disabled = true;
+        sellerInput.value = "";
+        console.error(err);
+      }
+    }
+
+    orderSelect.addEventListener("change", () => {
+      const selectedOrderId = Number(orderSelect.value);
+      const selectedOrder = reportableOrders.find((o) => Number(o.id) === selectedOrderId);
+      sellerInput.value = selectedOrder ? `${selectedOrder.sellerName} (ID: ${selectedOrder.sellerId})` : "";
+    });
+
+    submitButton.addEventListener("click", async () => {
+      const orderId = Number(orderSelect.value);
+      const selectedOrder = reportableOrders.find((o) => Number(o.id) === orderId);
+      const reason = reasonInput.value.trim();
+      if (!selectedOrder || !reason) {
+        alert("Select an order and provide a reason.");
+        return;
+      }
+
+      try {
+        await apiSend("/api/flags/seller", "POST", {
+          orderId: selectedOrder.id,
+          sellerId: selectedOrder.sellerId,
+          buyerId,
+          reason: "Other",
+          details: reason
+        });
+
+        orderSelect.value = "";
+        sellerInput.value = "";
+        reasonInput.value = "";
+        alert("Seller report submitted successfully.");
+      } catch (err) {
+        alert(err.message || "Failed to submit report");
+      }
+    });
+
+    loadReportableOrders();
+
+    document.querySelectorAll('.nav__item[data-screen="report"]').forEach((item) => {
+      item.addEventListener("click", loadReportableOrders);
+    });
+  }
+
+  async function renderHomeScreen() {
+    try {
+      const products = await loadCatalog();
+      ReactDOM.createRoot(homeRoot).render(
+        <HomeScreen
+          products={products}
+          onPlaceOrder={placeOrder}
+          onRateProduct={rateProduct}
+          buyerName={buyerDisplayName}
+        />
+      );
+    } catch (err) {
+      homeRoot.innerHTML = `<div class="order-card">${err.message || "Failed to load catalog"}</div>`;
+    }
+  }
+
+  function renderOrdersScreen() {
+    ReactDOM.createRoot(ordersRoot).render(
+      <OrdersScreen
+        buyerId={buyerId}
+        refreshSignal={rerenderOrders}
+        onTotalsChanged={updateBuyerTotalsFromOrders}
+      />
+    );
+  }
+
+  renderHomeScreen();
+  renderOrdersScreen();
+  hydrateBuyerIdentity();
+  attachReportForm();
 }
 
 mount();

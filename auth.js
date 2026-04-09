@@ -1,4 +1,6 @@
 const { useState } = React;
+const API_BASE = "http://localhost:4000";
+const SESSION_KEY = "marketplace.auth.user";
 
 /* ── Validation ─────────────────────────────────────────── */
 function validateEmail(email) {
@@ -12,6 +14,19 @@ function validatePassword(pw) {
   return errors;
 }
 
+async function requestJson(path, payload) {
+  const response = await fetch(`${API_BASE}${path}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload)
+  });
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    throw new Error(data.message || 'Request failed');
+  }
+  return data;
+}
+
 /* ── Login ──────────────────────────────────────────────── */
 function Login({ onGoSignup }) {
   const [email, setEmail]           = useState('');
@@ -19,8 +34,10 @@ function Login({ onGoSignup }) {
   const [showPw, setShowPw]         = useState(false);
   const [errors, setErrors]         = useState({});
   const [successMsg, setSuccessMsg] = useState('');
+  const [serverError, setServerError] = useState('');
+  const [loading, setLoading] = useState(false);
 
-  function handleSubmit(e) {
+  async function handleSubmit(e) {
     e.preventDefault();
     const errs = {};
 
@@ -42,15 +59,26 @@ function Login({ onGoSignup }) {
       return;
     }
 
+    setServerError('');
     setErrors({});
-    setSuccessMsg('Logged in successfully! Redirecting...');
+    setLoading(true);
+    try {
+      const data = await requestJson('/api/auth/login', {
+        email: email.trim(),
+        password
+      });
 
-    const isTrader = email.trim().toLowerCase() === 'trader@gmail.com';
-    setTimeout(() => {
-      window.location.href = isTrader
-        ? 'seller.html'
-        : 'Buyer.html';
-    }, 1000);
+      localStorage.setItem(SESSION_KEY, JSON.stringify(data.user));
+      setSuccessMsg('Logged in successfully! Redirecting...');
+
+      setTimeout(() => {
+        window.location.href = data.user.role === 'seller' ? 'seller.html' : 'Buyer.html';
+      }, 600);
+    } catch (err) {
+      setServerError(err.message || 'Login failed');
+    } finally {
+      setLoading(false);
+    }
   }
 
   return (
@@ -60,6 +88,7 @@ function Login({ onGoSignup }) {
       <p className="auth-subtitle">Sign in to your account</p>
 
       {successMsg && <div className="alert alert-success">{successMsg}</div>}
+      {serverError && <div className="alert alert-error">{serverError}</div>}
 
       <form onSubmit={handleSubmit} noValidate>
         <div className="form-group">
@@ -91,7 +120,9 @@ function Login({ onGoSignup }) {
           {errors.password && <span className="error-msg">{errors.password}</span>}
         </div>
 
-        <button type="submit" className="btn-primary">Sign In</button>
+        <button type="submit" className="btn-primary" disabled={loading}>
+          {loading ? 'Signing in...' : 'Sign In'}
+        </button>
       </form>
 
       <p className="auth-footer">
@@ -104,6 +135,9 @@ function Login({ onGoSignup }) {
 
 /* ── Signup ─────────────────────────────────────────────── */
 function Signup({ onGoLogin }) {
+  const [role, setRole]             = useState('buyer');
+  const [name, setName]             = useState('');
+  const [businessName, setBusinessName] = useState('');
   const [email, setEmail]           = useState('');
   const [password, setPassword]     = useState('');
   const [confirm, setConfirm]       = useState('');
@@ -111,12 +145,22 @@ function Signup({ onGoLogin }) {
   const [showCfm, setShowCfm]       = useState(false);
   const [errors, setErrors]         = useState({});
   const [successMsg, setSuccessMsg] = useState('');
+  const [serverError, setServerError] = useState('');
+  const [loading, setLoading] = useState(false);
 
   const matchStatus = !confirm ? null : password === confirm ? 'match' : 'nomatch';
 
-  function handleSubmit(e) {
+  async function handleSubmit(e) {
     e.preventDefault();
     const errs = {};
+
+    if (!name.trim()) {
+      errs.name = 'Name is required.';
+    }
+
+    if (role === 'seller' && !businessName.trim()) {
+      errs.businessName = 'Business name is required for sellers.';
+    }
 
     if (!email.trim()) {
       errs.email = 'Email is required.';
@@ -138,9 +182,24 @@ function Signup({ onGoLogin }) {
       return;
     }
 
+    setServerError('');
     setErrors({});
-    setSuccessMsg('Account created! Redirecting to login...');
-    setTimeout(() => { setSuccessMsg(''); onGoLogin(); }, 2000);
+    setLoading(true);
+    try {
+      await requestJson('/api/auth/signup', {
+        role,
+        name: name.trim(),
+        businessName: businessName.trim(),
+        email: email.trim(),
+        password
+      });
+      setSuccessMsg('Account created! Redirecting to login...');
+      setTimeout(() => { setSuccessMsg(''); onGoLogin(); }, 1000);
+    } catch (err) {
+      setServerError(err.message || 'Signup failed');
+    } finally {
+      setLoading(false);
+    }
   }
 
   return (
@@ -150,8 +209,50 @@ function Signup({ onGoLogin }) {
       <p className="auth-subtitle">Sign up to get started</p>
 
       {successMsg && <div className="alert alert-success">{successMsg}</div>}
+      {serverError && <div className="alert alert-error">{serverError}</div>}
 
       <form onSubmit={handleSubmit} noValidate>
+        <div className="form-group">
+          <label className="form-label">Account Type</label>
+          <select
+            className="form-input"
+            value={role}
+            onChange={(e) => {
+              setRole(e.target.value);
+              setErrors(p => ({ ...p, businessName: '' }));
+            }}
+          >
+            <option value="buyer">Buyer</option>
+            <option value="seller">Seller</option>
+          </select>
+        </div>
+
+        <div className="form-group">
+          <label className="form-label">Full Name</label>
+          <input
+            type="text"
+            className={`form-input${errors.name ? ' input-error' : ''}`}
+            placeholder="Your full name"
+            value={name}
+            onChange={(e) => { setName(e.target.value); setErrors(p => ({...p, name: ''})); }}
+          />
+          {errors.name && <span className="error-msg">{errors.name}</span>}
+        </div>
+
+        {role === 'seller' && (
+          <div className="form-group">
+            <label className="form-label">Business Name</label>
+            <input
+              type="text"
+              className={`form-input${errors.businessName ? ' input-error' : ''}`}
+              placeholder="Your store/business name"
+              value={businessName}
+              onChange={(e) => { setBusinessName(e.target.value); setErrors(p => ({...p, businessName: ''})); }}
+            />
+            {errors.businessName && <span className="error-msg">{errors.businessName}</span>}
+          </div>
+        )}
+
         <div className="form-group">
           <label className="form-label">Email</label>
           <input
@@ -210,7 +311,9 @@ function Signup({ onGoLogin }) {
           {errors.confirm && <span className="error-msg">{errors.confirm}</span>}
         </div>
 
-        <button type="submit" className="btn-primary">Create Account</button>
+        <button type="submit" className="btn-primary" disabled={loading}>
+          {loading ? 'Creating account...' : 'Create Account'}
+        </button>
       </form>
 
       <p className="auth-footer">

@@ -1,90 +1,70 @@
 const { useState } = React;
 
+const API_BASE = "http://localhost:4000";
+const SESSION_KEY = "marketplace.auth.user";
+
+let products = [];
+let orders = [];
+let activeOrderFilter = "All";
+
+function normalizeImageUrl(raw) {
+  const value = String(raw || "").trim();
+  if (!value) return "";
+  return value;
+}
+
+function getCurrentSeller() {
+  try {
+    const raw = localStorage.getItem(SESSION_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    if (!parsed || parsed.role !== "seller") return null;
+    return parsed;
+  } catch {
+    return null;
+  }
+}
+
+async function api(path, options = {}) {
+  const response = await fetch(`${API_BASE}${path}`, {
+    headers: { "Content-Type": "application/json", ...(options.headers || {}) },
+    ...options
+  });
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(data.message || "Request failed");
+  return data;
+}
+
 function ProductForm() {
   const [rating, setRating] = useState(0);
   const [hover, setHover] = useState(null);
   const [image, setImage] = useState("");
 
   const value = hover ?? rating;
-  const clampHalf = (v) => Math.max(0, Math.min(5, Math.round(v * 2) / 2));
-  const setValue = (v) => setRating(clampHalf(v));
 
   const handleImage = (file) => {
     if (file instanceof File) setImage(URL.createObjectURL(file));
-  };
-
-  const handleFileChange = (e) => handleImage(e.target.files?.[0]);
-  const handleDrop = (e) => {
-    e.preventDefault();
-    handleImage(e.dataTransfer.files?.[0]);
-  };
-  const handleDragOver = (e) => e.preventDefault();
-
-  const onStarsKeyDown = (e) => {
-    if (e.key === "ArrowRight") {
-      e.preventDefault();
-      setValue(rating + 0.5);
-    }
-    if (e.key === "ArrowLeft") {
-      e.preventDefault();
-      setValue(rating - 0.5);
-    }
-    if (e.key === "Home") {
-      e.preventDefault();
-      setValue(0);
-    }
-    if (e.key === "End") {
-      e.preventDefault();
-      setValue(5);
-    }
   };
 
   return (
     <div>
       <div className="form-group rating-group">
         <label>Initial rating</label>
-        <div
-          className="stars"
-          role="slider"
-          aria-label="Initial rating"
-          aria-valuemin={0}
-          aria-valuemax={5}
-          aria-valuenow={rating}
-          aria-valuetext={`${rating} out of 5`}
-          tabIndex={0}
-          onKeyDown={onStarsKeyDown}
-          onMouseLeave={() => setHover(null)}
-        >
+        <div className="stars" onMouseLeave={() => setHover(null)}>
           {[...Array(5)].map((_, i) => {
             const starValue = i + 1;
             const isFull = value >= starValue;
-            const isHalf = !isFull && value >= starValue - 0.5;
-            const icon = isFull ? "★" : isHalf ? "⯨" : "☆";
-
             return (
-              <div key={starValue} className="star">
-                <button
-                  type="button"
-                  className="hit hit-left"
-                  aria-label={starValue === 1 ? "Set rating to 0" : `Set rating to ${starValue - 0.5}`}
-                  onMouseEnter={() => setHover(starValue === 1 ? 0 : starValue - 0.5)}
-                  onFocus={() => setHover(starValue === 1 ? 0 : starValue - 0.5)}
-                  onBlur={() => setHover(null)}
-                  onClick={() => setValue(starValue === 1 ? 0 : starValue - 0.5)}
-                />
-                <button
-                  type="button"
-                  className="hit hit-right"
-                  aria-label={`Set rating to ${starValue}`}
-                  onMouseEnter={() => setHover(starValue)}
-                  onFocus={() => setHover(starValue)}
-                  onBlur={() => setHover(null)}
-                  onClick={() => setValue(starValue)}
-                />
-                <span className="star-icon" aria-hidden="true">
-                  {icon}
-                </span>
-              </div>
+              <button
+                key={starValue}
+                type="button"
+                className="star"
+                style={{ color: isFull ? "#f59e0b" : "#94a3b8", background: "transparent", border: "none", fontSize: "22px", cursor: "pointer" }}
+                onMouseEnter={() => setHover(starValue)}
+                onClick={() => setRating(starValue)}
+              >
+                ★
+              </button>
             );
           })}
         </div>
@@ -93,19 +73,17 @@ function ProductForm() {
 
       <div className="form-group image-group">
         <label>Product image</label>
-        <div className="image-frame" onDrop={handleDrop} onDragOver={handleDragOver}>
+        <div className="image-frame" onDrop={(e) => { e.preventDefault(); handleImage(e.dataTransfer.files?.[0]); }} onDragOver={(e) => e.preventDefault()}>
           {image ? (
             <img src={image} alt="preview" />
           ) : (
             <div className="placeholder">
-              <div className="upload-icon">📷</div>
               <div className="upload-title">Upload a product image</div>
-              <div className="upload-hint">Drag & drop, or click the button below</div>
             </div>
           )}
           <label className="upload-button">
             <span>Choose image</span>
-            <input type="file" accept="image/*" onChange={handleFileChange} hidden />
+            <input type="file" accept="image/*" onChange={(e) => handleImage(e.target.files?.[0])} hidden />
           </label>
         </div>
       </div>
@@ -113,63 +91,29 @@ function ProductForm() {
   );
 }
 
-let products = [
-  {
-    name: "Wireless Headphones",
-    price: 159,
-    rating: 4.8,
-    image: "headphones.jpg",
-    category: "Electronics",
-    inventory: 32,
-    orders: 120
-  },
-  {
-    name: "Smart Watch",
-    price: 220,
-    rating: 5.0,
-    image: "smartWatch.jpg",
-    category: "Wearables",
-    inventory: 18,
-    orders: 86
-  },
-  {
-    name: "Camera Lens",
-    price: 899,
-    rating: 4.3,
-    image: "lens.jpg",
-    category: "Photography",
-    inventory: 7,
-    orders: 42
-  }
-];
-
-let orders = [
-  { product: "Headphones", buyer: "Ali", status: "Pending" },
-  { product: "Smart Watch", buyer: "Sara", status: "Preparing" }
-];
-
-let activeOrderFilter = "All";
-
 function renderProducts(list = products) {
   const grid = document.getElementById("productGrid");
   if (!grid) return;
   grid.innerHTML = "";
+
   list.forEach((p) => {
-    const stars = "⭐".repeat(Math.round(p.rating));
+    const stars = "⭐".repeat(Math.max(1, Math.round(p.rating || 0)));
+    const image = normalizeImageUrl(p.image) || "https://images.unsplash.com/photo-1518441902110-3c6f91e2d7d0?w=500";
     grid.innerHTML += `
       <div class="card">
-        <div class="card-img-wrap">
-          <img src="${p.image}" alt="${p.name}">
-          <div class="badge badge-category">${p.category || "General"}</div>
-        </div>
+        <img src="${image}" alt="${p.name}">
         <div class="card-body">
-          <h3>${p.name}</h3>
-          <div class="card-meta-row">
-            <div class="price">$${p.price}</div>
-            <div class="rating">${stars} (${p.rating})</div>
+          <div class="card-title-row">
+            <div class="card-title">${p.name}</div>
+            <div class="card-chip">${p.category || "General"}</div>
           </div>
-          <div class="card-meta-sub">
-            <span>Inventory: ${p.inventory ?? "—"}</span>
+          <div class="price">$${Number(p.price || 0).toFixed(2)}</div>
+          <div class="card-meta">
+            <span>${stars} (${Number(p.rating || 0).toFixed(1)})</span>
+            <span>Stock: ${p.inventory ?? 0}</span>
+          </div>
+          <div class="card-meta">
+            <span>Delivery: ${p.deliveryEstimateDays ?? 1} day(s)</span>
             <span>Orders: ${p.orders ?? 0}</span>
           </div>
         </div>
@@ -178,113 +122,221 @@ function renderProducts(list = products) {
   });
 }
 
+function getOrderClass(status) {
+  const s = String(status || "").toLowerCase();
+  if (s === "delivered") return "order-status-delivered";
+  if (s === "preparing" || s === "processing") return "order-status-preparing";
+  return "order-status-pending";
+}
+
 function renderOrders() {
   const container = document.getElementById("ordersList");
   if (!container) return;
-  container.innerHTML = "";
+
   const visible = orders.filter((o) => activeOrderFilter === "All" || o.status === activeOrderFilter);
   if (!visible.length) {
     container.innerHTML = `<div class="order-list-empty">No orders match this filter.</div>`;
     return;
   }
-  visible.forEach((o, i) => {
-    container.innerHTML += `
-      <div class="order-card">
-        <div class="order-main">
-          <h3>${o.product}</h3>
-          <p>Buyer: <strong>${o.buyer}</strong></p>
-          <span class="order-status order-status-${o.status.toLowerCase()}">${o.status}</span>
-        </div>
-        <div class="order-actions">
-          <select onchange="changeStatus(${i}, this.value)">
-            <option ${o.status === "Pending" ? "selected" : ""}>Pending</option>
-            <option ${o.status === "Preparing" ? "selected" : ""}>Preparing</option>
-            <option ${o.status === "Delivered" ? "selected" : ""}>Delivered</option>
-          </select>
-          <button class="flag-btn" onclick="flagBuyer('${o.buyer}')">Flag Buyer</button>
-        </div>
+
+  container.innerHTML = visible.map((o) => `
+    <div class="order-card">
+      <div class="order-main">
+        <h3>${o.product}</h3>
+        <p>Buyer: <strong>${o.buyer}</strong></p>
+        <span class="order-status ${getOrderClass(o.status)}">${o.status}</span>
       </div>
-    `;
-  });
+      <div class="order-actions">
+        <select onchange="changeStatus(${o.id}, this.value)">
+          ${["Placed", "Processing", "Preparing", "Shipping", "Delivered", "Cancelled"]
+            .map((s) => `<option ${o.status === s ? "selected" : ""}>${s}</option>`)
+            .join("")}
+        </select>
+        <button class="flag-btn" onclick="flagBuyer(${o.id}, ${o.buyerId}, '${o.buyer.replace(/'/g, "\\'")}')">Flag Buyer</button>
+      </div>
+    </div>
+  `).join("");
 }
 
-function changeStatus(i, status) {
-  orders[i].status = status;
+async function loadProducts() {
+  const seller = getCurrentSeller();
+  if (!seller) return;
+  const data = await api(`/api/seller/${seller.id}/products`);
+  products = data.products || [];
+  renderProducts();
+}
+
+async function loadOrders() {
+  const seller = getCurrentSeller();
+  if (!seller) return;
+  const data = await api(`/api/seller/${seller.id}/orders`);
+  orders = data.orders || [];
   renderOrders();
 }
 
-function flagBuyer(name) {
-  alert(name + " flagged");
+async function loadSellerProfile() {
+  const seller = getCurrentSeller();
+  if (!seller) return;
+
+  const data = await api(`/api/seller/${seller.id}/profile`);
+  const profile = data.profile || {};
+
+  const set = (id, value) => {
+    const el = document.getElementById(id);
+    if (el) el.value = value ?? "";
+  };
+
+  set("profileName", profile.ownerName);
+  set("profileEmail", profile.email);
+  set("profileStoreName", profile.businessName);
+  set("profileCity", profile.city);
+  set("profileCountry", profile.country);
+  set("profileAddress", profile.addressLine);
+  set("profilePhone", profile.phone);
+  set("profileSupportEmail", profile.supportEmail);
+
+  const heading = document.getElementById("profileStoreHeading");
+  if (heading) heading.textContent = profile.businessName || "Your store";
 }
 
-function addProduct() {
-  const nameEl = document.getElementById("name");
-  const priceEl = document.getElementById("price");
-  const ratingEl = document.getElementById("rating");
-  const categoryEl = document.getElementById("category");
-  if (!nameEl || !priceEl || !categoryEl) return;
+async function saveSellerProfile() {
+  const seller = getCurrentSeller();
+  if (!seller) return;
 
-  const name = nameEl.value.trim();
-  const price = parseFloat(priceEl.value);
-  const rating = parseFloat(ratingEl?.value || "5");
-  const category = categoryEl.value || "General";
+  const ownerName = document.getElementById("profileName")?.value.trim();
+  const email = document.getElementById("profileEmail")?.value.trim();
+  const businessName = document.getElementById("profileStoreName")?.value.trim();
+  const city = document.getElementById("profileCity")?.value.trim();
+  const country = document.getElementById("profileCountry")?.value.trim();
+  const addressLine = document.getElementById("profileAddress")?.value.trim();
+  const phone = document.getElementById("profilePhone")?.value.trim();
+  const supportEmail = document.getElementById("profileSupportEmail")?.value.trim();
 
-  if (!name || isNaN(price)) {
-    alert("Please enter at least a product name and valid price.");
+  if (!ownerName || !email || !businessName) {
+    alert("Name, email, and store name are required.");
     return;
   }
 
-  products.push({
-    name,
-    price,
-    rating: isNaN(rating) ? 5 : rating,
-    image: "https://images.unsplash.com/photo-1518441902110-3c6f91e2d7d0?w=500",
-    category,
-    inventory: 0,
-    orders: 0
-  });
+  try {
+    await api(`/api/seller/${seller.id}/profile`, {
+      method: "PATCH",
+      body: JSON.stringify({ ownerName, email, businessName, city, country, addressLine, phone, supportEmail })
+    });
 
-  nameEl.value = "";
-  priceEl.value = "";
-  if (ratingEl) ratingEl.value = "";
-  categoryEl.value = categoryEl.options[0]?.value || "";
+    const nextSession = { ...seller, name: ownerName, businessName, email };
+    localStorage.setItem(SESSION_KEY, JSON.stringify(nextSession));
+    alert("Profile updated.");
+    await loadSellerProfile();
+  } catch (err) {
+    alert(err.message || "Failed to save profile");
+  }
+}
 
-  const searchInput = document.getElementById("homeSearchInput");
-  if (searchInput) searchInput.value = "";
+async function changeStatus(orderId, status) {
+  const seller = getCurrentSeller();
+  if (!seller) return;
 
-  renderProducts();
-  showScreen("home", document.querySelector('.nav-btn[onclick*="home"]'));
-  alert("Product added");
+  try {
+    await api(`/api/seller/orders/${orderId}/status`, {
+      method: "PATCH",
+      body: JSON.stringify({ sellerId: seller.id, status })
+    });
+
+    const target = orders.find((o) => o.id === orderId);
+    if (target) target.status = status;
+    renderOrders();
+  } catch (err) {
+    alert(err.message || "Failed to update status");
+  }
+}
+
+async function flagBuyer(orderId, buyerId, buyerName) {
+  const seller = getCurrentSeller();
+  if (!seller) return;
+
+  try {
+    await api(`/api/seller/flags/buyer`, {
+      method: "POST",
+      body: JSON.stringify({
+        orderId,
+        buyerId,
+        sellerId: seller.id,
+        reason: "Other",
+        details: `Seller flagged buyer ${buyerName}`
+      })
+    });
+    alert(`${buyerName} flagged successfully.`);
+  } catch (err) {
+    alert(err.message || "Failed to flag buyer");
+  }
+}
+
+async function addProduct() {
+  const seller = getCurrentSeller();
+  if (!seller) return;
+
+  const name = document.getElementById("name")?.value.trim();
+  const category = document.getElementById("category")?.value;
+  const price = Number(document.getElementById("price")?.value || 0);
+  const stock = Number(document.getElementById("stock")?.value || 0);
+  const deliveryDays = Number(document.getElementById("deliveryDays")?.value || 1);
+  const description = document.getElementById("description")?.value.trim();
+  const imageUrl = normalizeImageUrl(document.getElementById("imageUrl")?.value || "");
+
+  if (!name || !category || !Number.isFinite(price) || price <= 0 || deliveryDays < 1) {
+    alert("Please fill valid product name, category, price, and delivery estimate.");
+    return;
+  }
+
+  try {
+    await api(`/api/seller/products`, {
+      method: "POST",
+      body: JSON.stringify({
+        sellerId: seller.id,
+        name,
+        category,
+        price,
+        inventory: Math.max(0, stock),
+        deliveryEstimateDays: deliveryDays,
+        description,
+        image: imageUrl
+      })
+    });
+
+    alert("Product added.");
+    await loadProducts();
+    showScreen("home", document.querySelector(".nav-btn[onclick*=\"home\"]"));
+  } catch (err) {
+    alert(err.message || "Failed to add product");
+  }
 }
 
 function showScreen(id, btn) {
   document.querySelectorAll(".screen").forEach((s) => s.classList.remove("active"));
-  const target = document.getElementById(id);
-  if (target) target.classList.add("active");
+  document.getElementById(id)?.classList.add("active");
 
-  document.querySelectorAll(".nav-btn").forEach((n) => n.classList.remove("active"));
+  document.querySelectorAll(".nav-btn").forEach((b) => b.classList.remove("active"));
   if (btn) btn.classList.add("active");
 
   if (id === "home") renderProducts();
   if (id === "orders") renderOrders();
-}
-
-function attachNavHandlers() {
-  document.querySelectorAll(".nav-btn").forEach((btn) => {
-    btn.addEventListener("click", () => {
-      const id = btn.getAttribute("onclick")?.match(/showScreen\('([^']+)'/)?.[1];
-      if (id) showScreen(id, btn);
-    });
+  if (id === "profile") loadSellerProfile().catch((err) => {
+    alert(err.message || "Failed to load profile");
   });
 }
 
 function attachSearchHandler() {
   const searchInput = document.getElementById("homeSearchInput");
   if (!searchInput) return;
+
   searchInput.addEventListener("input", () => {
-    const query = searchInput.value.trim().toLowerCase();
-    if (!query) return renderProducts();
-    renderProducts(products.filter((p) => p.name.toLowerCase().includes(query) || (p.category || "").toLowerCase().includes(query)));
+    const q = searchInput.value.trim().toLowerCase();
+    if (!q) return renderProducts();
+    const filtered = products.filter((p) =>
+      p.name.toLowerCase().includes(q) ||
+      String(p.category || "").toLowerCase().includes(q)
+    );
+    renderProducts(filtered);
   });
 }
 
@@ -299,16 +351,27 @@ function attachOrderFilterHandlers() {
   });
 }
 
-function mountApp() {
-  attachNavHandlers();
-  attachSearchHandler();
-  attachOrderFilterHandlers();
-  renderProducts();
-  renderOrders();
-  showScreen("home", document.querySelector('.nav-btn[onclick*="home"]'));
+async function mountApp() {
+  const seller = getCurrentSeller();
+  if (!seller) {
+    alert("Please login as a seller first.");
+    window.location.href = "Login.html";
+    return;
+  }
 
   const rootEl = document.getElementById("root");
   if (rootEl) ReactDOM.createRoot(rootEl).render(<ProductForm />);
+
+  attachSearchHandler();
+  attachOrderFilterHandlers();
+
+  try {
+    await Promise.all([loadProducts(), loadOrders(), loadSellerProfile()]);
+  } catch (err) {
+    alert(err.message || "Failed to load seller data");
+  }
+
+  showScreen("home", document.querySelector(".nav-btn[onclick*=\"home\"]"));
 }
 
 document.addEventListener("DOMContentLoaded", mountApp);
@@ -318,12 +381,4 @@ window.changeStatus = changeStatus;
 window.flagBuyer = flagBuyer;
 window.addProduct = addProduct;
 window.showScreen = showScreen;
-window.renderProducts = renderProducts;
-window.renderOrders = renderOrders;
-window.setActiveOrderFilter = function (status) {
-  activeOrderFilter = status || "All";
-  document.querySelectorAll(".order-filters .filter-pill").forEach((b) => b.classList.remove("active"));
-  const activeBtn = document.querySelector(`.order-filters .filter-pill[data-status="${activeOrderFilter}"]`);
-  if (activeBtn) activeBtn.classList.add("active");
-  renderOrders();
-};
+window.saveSellerProfile = saveSellerProfile;
