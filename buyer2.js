@@ -26,16 +26,9 @@ const { useEffect, useMemo, useState } = React;
 const STORAGE_KEY = "buyerApp.orders.v1";
 const STORAGE_RATINGS_KEY = "buyerApp.ratings.v1";
 
-function loadOrders() {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (!raw) return [];
-    const parsed = JSON.parse(raw);
-    if (!Array.isArray(parsed)) return [];
-    return parsed;
-  } catch {
-    return [];
-  }
+async function loadOrders() {
+  const res = await fetch("http://localhost:3000/orders");
+  return await res.json();
 }
 
 function saveOrders(next) {
@@ -325,8 +318,12 @@ function OrdersScreen() {
     return orders.filter((o) => o.status === filter);
   }, [orders, filter]);
 
-  function updateOrder(id, patch) {
-    const next = orders.map((o) => (o.id === id ? { ...o, ...patch } : o));
+  async function updateOrder(id, patch) {
+    await fetch(`http://localhost:3000/orders/${id}`, {
+      method: "PUT",
+      headers: {"Content-Type": "application/json"},
+      body: JSON.stringify({status: "Delivered"})
+    });
     setOrders(next);
     saveOrders(next);
   }
@@ -427,21 +424,16 @@ function mount() {
     if (countEl) countEl.textContent = String(orders.length);
   }
 
-  function placeOrder(product) {
-    const current = loadOrders();
-    const next = [
-      {
-        id: `o_${Date.now()}_${Math.random().toString(16).slice(2)}`,
+  async function placeOrder(product) {
+    await fetch("http://localhost:3000/orders", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
         productId: product.id,
         productName: product.name,
-        productPrice: product.price,
-        status: "Processing",
-        comment: ""
-      },
-      ...current
-    ];
-    saveOrders(next);
-    alert("Order placed successfully!");
+        productPrice: product.price
+      })
+    });
   }
 
   ReactDOM.createRoot(homeRoot).render(<HomeScreen products={products} onPlaceOrder={placeOrder} />);
