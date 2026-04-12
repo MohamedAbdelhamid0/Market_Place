@@ -20,37 +20,29 @@ function Login({ onGoSignup }) {
   const [errors, setErrors]         = useState({});
   const [successMsg, setSuccessMsg] = useState('');
 
-  function handleSubmit(e) {
+  async function handleSubmit(e) {
     e.preventDefault();
-    const errs = {};
 
-    if (!email.trim()) {
-      errs.email = 'Email is required.';
-    } else if (!validateEmail(email)) {
-      errs.email = 'Please enter a valid email address.';
-    }
+    const res = await fetch('http://localhost:5000/login', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ email, password })
+    });
 
-    if (!password) {
-      errs.password = 'Password is required.';
+    const data = await res.json();
+
+    if (res.ok) {
+      setSuccessMsg('Logged in successfully!');
+      localStorage.setItem("token", data.token);
+
+      setTimeout(() => {
+        window.location.href = 'Buyer.html';
+      }, 1000);
     } else {
-      const pwErrs = validatePassword(password);
-      if (pwErrs.length > 0) errs.password = pwErrs.join(' · ');
+      setErrors({ password: data.message });
     }
-
-    if (Object.keys(errs).length > 0) {
-      setErrors(errs);
-      return;
-    }
-
-    setErrors({});
-    setSuccessMsg('Logged in successfully! Redirecting...');
-
-    const isTrader = email.trim().toLowerCase() === 'trader@gmail.com';
-    setTimeout(() => {
-      window.location.href = isTrader
-        ? 'seller.html'
-        : 'Buyer.html';
-    }, 1000);
   }
 
   return (
@@ -114,33 +106,25 @@ function Signup({ onGoLogin }) {
 
   const matchStatus = !confirm ? null : password === confirm ? 'match' : 'nomatch';
 
-  function handleSubmit(e) {
+  async function handleSubmit(e) {
     e.preventDefault();
-    const errs = {};
 
-    if (!email.trim()) {
-      errs.email = 'Email is required.';
-    } else if (!validateEmail(email)) {
-      errs.email = 'Please enter a valid email address.';
+    const res = await fetch('http://localhost:5000/signup', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ email, password })
+    });
+
+    const data = await res.json();
+
+    if (res.ok) {
+      setSuccessMsg("Account created!");
+      setTimeout(() => onGoLogin(), 2000);
+    } else {
+      setErrors({ email: data.message });
     }
-
-    const pwErrs = validatePassword(password);
-    if (pwErrs.length > 0) errs.password = pwErrs.join(' · ');
-
-    if (!confirm) {
-      errs.confirm = 'Please confirm your password.';
-    } else if (password !== confirm) {
-      errs.confirm = 'Passwords do not match.';
-    }
-
-    if (Object.keys(errs).length > 0) {
-      setErrors(errs);
-      return;
-    }
-
-    setErrors({});
-    setSuccessMsg('Account created! Redirecting to login...');
-    setTimeout(() => { setSuccessMsg(''); onGoLogin(); }, 2000);
   }
 
   return (
