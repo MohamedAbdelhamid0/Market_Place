@@ -1,5 +1,17 @@
 const jwt = require("jsonwebtoken");
 
+
+function validateEmail(email) {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim());
+}
+
+function validatePassword(pw) {
+  const errors = [];
+  if (pw.length < 8) errors.push('At least 8 characters');
+  if (!/^[A-Z]/.test(pw)) errors.push('Must start with a capital letter');
+  return errors;
+}
+
 function auth(requiredRole = null) {
   return (req, res, next) => {
     const header = req.headers.authorization || "";
@@ -24,4 +36,8 @@ function auth(requiredRole = null) {
   };
 }
 
-module.exports = auth;
+module.exports = {
+  auth,
+  validateEmail,
+  validatePassword
+};

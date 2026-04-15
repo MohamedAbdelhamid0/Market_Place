@@ -3,6 +3,7 @@ const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 const mysql = require("mysql2/promise");
 const User = require("../models/User");
+const { validateEmail, validatePassword } = require("../middleware/auth");
 
 const router = express.Router();
 
@@ -116,6 +117,17 @@ router.post("/register", async (req, res) => {
       return res.status(400).json({ message: "name, email, password, role are required" });
     }
 
+    // Validate email format
+    if (!validateEmail(email)) {
+      return res.status(400).json({ message: "Invalid email format" });
+    }
+
+    // Validate password requirements
+    const passwordErrors = validatePassword(password);
+    if (passwordErrors.length > 0) {
+      return res.status(400).json({ message: "Password requirements not met", errors: passwordErrors });
+    }
+
     const exists = await User.findOne({ email: String(email).toLowerCase().trim() });
     if (exists) return res.status(409).json({ message: "Email already exists" });
 
@@ -155,6 +167,11 @@ router.post("/login", async (req, res) => {
     const { email, password } = req.body || {};
     if (!email || !password) {
       return res.status(400).json({ message: "email and password are required" });
+    }
+
+    // Validate email format
+    if (!validateEmail(email)) {
+      return res.status(400).json({ message: "Invalid email format" });
     }
 
     const user = await User.findOne({ email: String(email).toLowerCase().trim() });
