@@ -102,9 +102,17 @@ export default function AddProductPage() {
         </div>
         <div className="form-group">
           <label>Product Image</label>
-          <input type="file" accept="image/*" onChange={(e) => setForm((p) => ({ ...p, imageFile: e.target.files?.[0] || null }))} />
+          <div className="file-upload-wrapper">
+            <input 
+              id="product-image-input"
+              type="file" 
+              accept="image/*" 
+              onChange={(e) => setForm((p) => ({ ...p, imageFile: e.target.files?.[0] || null }))} 
+            />
+            <label htmlFor="product-image-input" className="file-upload-label">Choose File</label>
+          </div>
           <input placeholder="Image URL" value={form.imageUrl} onChange={(e) => setForm((p) => ({ ...p, imageUrl: e.target.value }))} style={{ marginTop: 8 }} />
-          {form.imageFile ? <p>Selected image: {form.imageFile.name}</p> : null}
+          {form.imageFile ? <p style={{ marginTop: 8, fontSize: '0.85rem', color: 'var(--text-muted)' }}>Selected: {form.imageFile.name}</p> : null}
         </div>
         <div className="form-actions">
           <button type="submit" className="btn-save">Save Product</button>

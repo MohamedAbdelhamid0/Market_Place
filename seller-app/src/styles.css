@@ -515,6 +515,34 @@
       min-height: 80px;
     }
 
+    .file-upload-wrapper {
+      position: relative;
+      margin-top: 8px;
+    }
+
+    #product-image-input {
+      display: none;
+    }
+
+    .file-upload-label {
+      display: inline-block;
+      width: 100%;
+      padding: 10px 16px;
+      border-radius: 999px;
+      border: none;
+      background: var(--accent-gradient);
+      color: #0b1120;
+      font-size: 0.9rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: transform 0.2s ease;
+      text-align: center;
+    }
+
+    .file-upload-label:hover {
+      transform: translateY(-2px);
+    }
+
     .form-row {
       display: grid;
       grid-template-columns: 1fr 1fr;
@@ -561,6 +589,29 @@
 
     .btn-save:hover {
       transform: translateY(-2px);
+    }
+
+    .btn-rating-save {
+      width: 100%;
+      padding: 10px 16px;
+      border-radius: 6px;
+      border: 1px solid rgba(56, 189, 248, 0.5);
+      background: rgba(56, 189, 248, 0.08);
+      color: #38bdf8;
+      font-size: 0.85rem;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      margin-top: 8px;
+    }
+
+    .btn-rating-save:hover {
+      background: rgba(56, 189, 248, 0.15);
+      border-color: rgba(56, 189, 248, 0.7);
+    }
+
+    .order-footer .form-actions {
+      flex-direction: column;
     }
 
     /* Empty state */
@@ -718,6 +769,19 @@
       font-size: 0.85rem;
       color: var(--text-muted);
       margin-bottom: 8px;
+    }
+
+    .order-footer {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-end;
+      gap: 16px;
+    }
+
+    .order-price {
+      font-size: 1.1rem;
+      font-weight: 700;
+      color: var(--accent-strong);
     }
 
     .order-status-select {

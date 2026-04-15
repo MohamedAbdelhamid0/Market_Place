@@ -102,7 +102,7 @@ export default function OrdersManagementPage() {
               <div className="order-price">${Number(order.totalPrice || 0).toFixed(2)}</div>
               <div className="form-actions">
                 <button
-                  className="btn-save"
+                  className="btn-rating-save"
                   onClick={() => {
                     const rating = Number(document.getElementById(`buyer-rating-${order._id}`)?.value || 0);
                     const comment = document.getElementById(`buyer-rating-comment-${order._id}`)?.value || "";
