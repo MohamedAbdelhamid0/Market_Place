@@ -3,6 +3,12 @@ backend/node_modules/
 buyer-app/node_modules/
 seller-app/node_modules/
 
+@"
+node_modules/
+*/node_modules/
+.env
+uploads/
+"@ | Add-Content .gitignore
 
 # Monorepo app env files
 backend/.env
