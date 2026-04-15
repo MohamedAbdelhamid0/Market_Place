@@ -62,7 +62,7 @@ export default function Signup({ onNavigateLogin }) {
           <div className="logo-icon">✨</div>
         </div>
         <h1 className="auth-title">Create account</h1>
-        <p className="auth-subtitle">Join us today — it's free</p>
+        <p className="auth-subtitle">Join us today - it's free</p>
 
         {success && (
           <div className="alert alert-success">

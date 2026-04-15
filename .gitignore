@@ -1,10 +1,21 @@
 # Dependencies
-node_modules/
+backend/node_modules/
+buyer-app/node_modules/
+seller-app/node_modules/
 
-# Environment secrets
-.env
-.env.*
-!.env.example
+
+# Monorepo app env files
+backend/.env
+backend/.env.*
+!backend/.env.example
+
+buyer-app/.env
+buyer-app/.env.*
+!buyer-app/.env.example
+
+seller-app/.env
+seller-app/.env.*
+!seller-app/.env.example
 
 # Runtime uploads and generated assets
 uploads/

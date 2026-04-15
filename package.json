@@ -1,11 +1,13 @@
 {
-  "name": "market-place-auth-api",
+  "name": "market-place-monorepo",
   "version": "1.0.0",
   "private": true,
   "type": "commonjs",
   "scripts": {
-    "start": "node server.js",
-    "dev": "node server.js"
+    "dev:backend": "npm --prefix backend run dev",
+    "dev:buyer": "npm --prefix buyer-app run dev",
+    "dev:seller": "npm --prefix seller-app run dev",
+    "install:all": "npm install && npm --prefix backend install && npm --prefix buyer-app install && npm --prefix seller-app install"
   },
   "dependencies": {
     "bcryptjs": "^2.4.3",
