@@ -7,8 +7,8 @@ function validateEmail(email) {
 
 function validatePassword(pw) {
   const errors = [];
-  if (pw.length < 8) errors.push('At least 8 characters');
-  if (!/^[A-Z]/.test(pw)) errors.push('Must start with a capital letter');
+  if (pw.length < 8) errors.push('Must be at least 8 characters long.');
+  if (!/^[A-Z]/.test(pw)) errors.push('Must start with a capital letter.');
   return errors;
 }
 

@@ -125,7 +125,7 @@ router.post("/register", async (req, res) => {
     // Validate password requirements
     const passwordErrors = validatePassword(password);
     if (passwordErrors.length > 0) {
-      return res.status(400).json({ message: "Password requirements not met", errors: passwordErrors });
+      return res.status(400).json({ message: passwordErrors.join(", "), errors: passwordErrors });
     }
 
     const exists = await User.findOne({ email: String(email).toLowerCase().trim() });

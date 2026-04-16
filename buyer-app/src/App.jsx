@@ -66,9 +66,8 @@ function AuthScreen({ onAuthed }) {
           <div className="logo-icon">{mode === "login" ? "🔐" : "✨"}</div>
         </div>
         <h1 className="auth-title">{mode === "login" ? "Welcome back" : "Create account"}</h1>
-        <p className="auth-subtitle">{mode === "login" ? "Sign in to your account" : "Join us today — it&apos;s free"}</p>
+        <p className="auth-subtitle">{mode === "login" ? "Sign in to your account" : "Join us today — it's free"}</p>
 
-        {error ? <div className="alert alert-error">{error}</div> : null}
 
         <form className="auth-form" onSubmit={submit} noValidate>
           {mode === "register" ? (
@@ -110,6 +109,8 @@ function AuthScreen({ onAuthed }) {
               required
             />
           </div>
+
+          {error ? <div className="alert alert-error">{error}</div> : null}
 
           <button type="submit" className="btn-primary">
             {mode === "login" ? "Sign In" : "Create Account"}
