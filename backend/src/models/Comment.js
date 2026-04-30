@@ -10,4 +10,6 @@ const commentSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
+commentSchema.index({ productId: 1, userId: 1 }, { unique: true });
+
 module.exports = mongoose.model("Comment", commentSchema);

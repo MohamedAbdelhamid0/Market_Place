@@ -48,8 +48,26 @@ router.get("/", async (req, res) => {
     if (category) filter.category = category;
     if (q) filter.name = { $regex: q, $options: "i" };
 
-    const products = await Product.find(filter).sort({ createdAt: -1 });
-    return res.json(products);
+    const products = await Product.find(filter).sort({ createdAt: -1 }).lean();
+    const sellerIds = [...new Set(products.map((product) => String(product.sellerId)))];
+    const sellers = sellerIds.length ? await require("../models/User").find({ _id: { $in: sellerIds } }).select("name businessName email supportEmail phone city country").lean() : [];
+    const sellerMap = new Map(sellers.map((seller) => [String(seller._id), seller]));
+
+    return res.json(
+      products.map((product) => {
+        const seller = sellerMap.get(String(product.sellerId));
+        return {
+          ...product,
+          sellerName: seller?.name || "Seller",
+          sellerBusinessName: seller?.businessName || "",
+          sellerEmail: seller?.email || "",
+          sellerSupportEmail: seller?.supportEmail || "",
+          sellerPhone: seller?.phone || "",
+          sellerCity: seller?.city || "",
+          sellerCountry: seller?.country || ""
+        };
+      })
+    );
   } catch (err) {
     return res.status(500).json({ message: "Failed to fetch products", error: err.message });
   }
@@ -104,11 +122,25 @@ router.get("/seller/me/list", auth("seller"), async (req, res) => {
 
 router.get("/:id", async (req, res) => {
   try {
-    const product = await Product.findById(req.params.id);
+    const product = await Product.findById(req.params.id).lean();
     if (!product) return res.status(404).json({ message: "Product not found" });
 
-    const comments = await Comment.find({ productId: product._id }).sort({ createdAt: -1 }).limit(20);
-    return res.json({ product, comments });
+    const User = require("../models/User");
+    const seller = await User.findById(product.sellerId).select("name businessName email supportEmail phone city country").lean();
+    const comments = await Comment.find({ productId: product._id }).sort({ createdAt: -1 }).limit(20).lean();
+    return res.json({
+      product: {
+        ...product,
+        sellerName: seller?.name || "Seller",
+        sellerBusinessName: seller?.businessName || "",
+        sellerEmail: seller?.email || "",
+        sellerSupportEmail: seller?.supportEmail || "",
+        sellerPhone: seller?.phone || "",
+        sellerCity: seller?.city || "",
+        sellerCountry: seller?.country || ""
+      },
+      comments
+    });
   } catch (err) {
     return res.status(500).json({ message: "Failed to fetch product", error: err.message });
   }

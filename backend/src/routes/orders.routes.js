@@ -3,6 +3,7 @@ const Order = require("../models/Order");
 const Product = require("../models/Product");
 const User = require("../models/User");
 const SellerBuyerRating = require("../models/SellerBuyerRating");
+const BuyerSellerRating = require("../models/BuyerSellerRating");
 const { auth } = require("../middleware/auth");
 
 const router = express.Router();
@@ -84,10 +85,68 @@ router.post("/", auth("buyer"), async (req, res) => {
 
 router.get("/buyer/me", auth("buyer"), async (req, res) => {
   try {
-    const orders = await Order.find({ buyerId: req.user.id }).sort({ createdAt: -1 });
-    return res.json(orders);
+    const orders = await Order.find({ buyerId: req.user.id }).sort({ createdAt: -1 }).lean();
+
+    const sellerIds = [...new Set(orders.map((order) => String(order.sellerId)))];
+    const orderIds = orders.map((order) => order._id);
+    const productIds = [
+      ...new Set(orders.flatMap((order) => (order.products || []).map((item) => String(item.productId))))
+    ];
+
+    const [sellers, products, sellerRatings] = await Promise.all([
+      User.find({ _id: { $in: sellerIds } }).select("name").lean(),
+      Product.find({ _id: { $in: productIds } }).select("name imageUrl sellerId").lean(),
+      BuyerSellerRating.find({ orderId: { $in: orderIds }, buyerId: req.user.id }).lean()
+    ]);
+
+    const sellerMap = new Map(sellers.map((seller) => [String(seller._id), seller.name]));
+    const productMap = new Map(products.map((product) => [String(product._id), product]));
+    const ratingMap = new Map(sellerRatings.map((rating) => [String(rating.orderId), rating]));
+
+    const payload = orders.map((order) => {
+      const itemsDetailed = (order.products || []).map((item) => {
+        const product = productMap.get(String(item.productId));
+        return {
+          productId: item.productId,
+          quantity: Number(item.quantity || 0),
+          price: Number(item.price || 0),
+          productName: product?.name || "Product",
+          imageUrl: product?.imageUrl || "",
+          sellerId: product?.sellerId || order.sellerId,
+          sellerName: sellerMap.get(String(product?.sellerId || order.sellerId)) || "Seller"
+        };
+      });
+
+      const orderRating = ratingMap.get(String(order._id));
+      return {
+        ...order,
+        sellerName: sellerMap.get(String(order.sellerId)) || "Seller",
+        productName: itemsDetailed[0]?.productName || `Order ${String(order._id).slice(-6)}`,
+        itemsDetailed,
+        sellerRating: orderRating
+          ? {
+              rating: Number(orderRating.rating || 0),
+              comment: orderRating.comment || ""
+            }
+          : null
+      };
+    });
+
+    return res.json(payload);
   } catch (err) {
     return res.status(500).json({ message: "Failed to fetch orders", error: err.message });
+  }
+});
+
+router.delete("/buyer/:id", auth("buyer"), async (req, res) => {
+  try {
+    const order = await Order.findOne({ _id: req.params.id, buyerId: req.user.id });
+    if (!order) return res.status(404).json({ message: "Order not found" });
+
+    await Order.deleteOne({ _id: order._id, buyerId: req.user.id });
+    return res.json({ message: "Order removed" });
+  } catch (err) {
+    return res.status(500).json({ message: "Failed to remove order", error: err.message });
   }
 });
 
@@ -174,6 +233,28 @@ router.post("/seller/ratings/buyer", auth("seller"), async (req, res) => {
     return res.status(201).json(doc);
   } catch (err) {
     return res.status(500).json({ message: "Failed to rate buyer", error: err.message });
+  }
+});
+
+router.post("/buyer/ratings/seller", auth("buyer"), async (req, res) => {
+  try {
+    const { orderId, sellerId, rating, comment } = req.body || {};
+    if (!orderId || !sellerId || !rating || rating < 1 || rating > 5) {
+      return res.status(400).json({ message: "orderId, sellerId and rating (1-5) are required" });
+    }
+
+    const order = await Order.findOne({ _id: orderId, buyerId: req.user.id, sellerId });
+    if (!order) return res.status(404).json({ message: "Order not found for this seller" });
+
+    const doc = await BuyerSellerRating.findOneAndUpdate(
+      { orderId, sellerId, buyerId: req.user.id },
+      { rating: Number(rating), comment: String(comment || "").trim() },
+      { new: true, upsert: true }
+    );
+
+    return res.status(201).json(doc);
+  } catch (err) {
+    return res.status(500).json({ message: "Failed to rate seller", error: err.message });
   }
 });
 
