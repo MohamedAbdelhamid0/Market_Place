@@ -5,6 +5,18 @@ const Product = require("../models/Product");
 const Order = require("../models/Order");
 
 const router = express.Router();
+const PAYMENT_METHODS = ["Cash on Delivery", "Card Payment", "Wallet"];
+
+function addDays(baseDate, days) {
+  const dt = new Date(baseDate);
+  dt.setDate(dt.getDate() + Number(days || 0));
+  return dt;
+}
+
+function normalizePaymentMethod(value) {
+  const candidate = String(value || "").trim();
+  return PAYMENT_METHODS.includes(candidate) ? candidate : "Cash on Delivery";
+}
 
 function normalizeAddress(rawAddress = {}) {
   return {
@@ -42,7 +54,8 @@ async function buildBuyerCartPayload(userId) {
         unitPrice,
         quantity,
         lineTotal,
-        availableInventory: Number(product.inventory || 0)
+        availableInventory: Number(product.inventory || 0),
+        deliveryDays: Math.max(1, Number(product.deliveryDays || 1))
       };
     })
     .filter(Boolean);
@@ -339,6 +352,7 @@ router.delete("/buyer/me/wishlist/:productId", auth("buyer"), async (req, res) =
 
 router.post("/buyer/me/cart/checkout", auth("buyer"), async (req, res) => {
   try {
+    const paymentMethod = normalizePaymentMethod(req.body?.paymentMethod);
     const user = await User.findById(req.user.id).select("cart");
     if (!user) return res.status(404).json({ message: "Buyer not found" });
     if (!Array.isArray(user.cart) || !user.cart.length) {
@@ -369,6 +383,7 @@ router.post("/buyer/me/cart/checkout", auth("buyer"), async (req, res) => {
       }));
 
       let totalPrice = 0;
+      let expectedDeliveryDays = 1;
       const stockUpdates = [];
 
       for (const item of items) {
@@ -398,6 +413,7 @@ router.post("/buyer/me/cart/checkout", auth("buyer"), async (req, res) => {
 
         stockUpdates.push({ productId: item.productId, quantity: item.quantity });
         totalPrice += item.unitPrice * item.quantity;
+        expectedDeliveryDays = Math.max(expectedDeliveryDays, Number(item.deliveryDays || 1));
       }
 
       const order = await Order.create({
@@ -405,7 +421,11 @@ router.post("/buyer/me/cart/checkout", auth("buyer"), async (req, res) => {
         sellerId,
         products: orderItems,
         status: "Placed",
-        totalPrice
+        totalPrice,
+        paymentMethod,
+        paymentStatus: "Pending",
+        expectedDeliveryDays,
+        expectedDeliveryDate: addDays(new Date(), expectedDeliveryDays)
       });
 
       createdOrders.push(order);

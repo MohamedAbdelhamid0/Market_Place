@@ -229,6 +229,21 @@ router.put("/:id", auth("seller"), maybeUpload, async (req, res) => {
 
 router.delete("/:id", auth("seller"), async (req, res) => {
   try {
+    const product = await Product.findOne({ _id: req.params.id, sellerId: req.user.id }).select("_id");
+    if (!product) return res.status(404).json({ message: "Product not found" });
+
+    const blockingOrder = await Order.findOne({
+      sellerId: req.user.id,
+      "products.productId": product._id,
+      status: { $in: ["Placed", "Processing", "Preparing"] }
+    }).select("_id status");
+
+    if (blockingOrder) {
+      return res.status(400).json({
+        message: "Product cannot be deleted until all related orders are shipped"
+      });
+    }
+
     const result = await Product.deleteOne({ _id: req.params.id, sellerId: req.user.id });
     if (!result.deletedCount) return res.status(404).json({ message: "Product not found" });
     return res.json({ message: "Product deleted" });

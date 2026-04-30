@@ -25,6 +25,7 @@ export default function ManageProductsPage({ isActive = false }) {
   const [products, setProducts] = useState([]);
   const [editing, setEditing] = useState(null);
   const [categoryFilter, setCategoryFilter] = useState("all");
+  const [message, setMessage] = useState("");
 
   async function load() {
     const list = await api.myProducts();
@@ -75,13 +76,19 @@ export default function ManageProductsPage({ isActive = false }) {
   }
 
   async function removeProduct(id) {
-    await api.deleteProduct(id);
-    await load();
+    try {
+      await api.deleteProduct(id);
+      setMessage("Product deleted");
+      await load();
+    } catch (err) {
+      setMessage(err.message || "Failed to delete product");
+    }
   }
 
   return (
     <>
       <div className="filter-tabs">
+        {message ? <div className="alert success" style={{ width: "100%", marginBottom: 12 }}>{message}</div> : null}
         <button className={`filter-btn ${categoryFilter === "all" ? "active" : ""}`} onClick={() => setCategoryFilter("all")}>All Products</button>
         <div id="categoryFilters">
           {categories.filter((category) => category !== "Uncategorized").map((category) => (

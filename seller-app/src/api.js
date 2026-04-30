@@ -75,6 +75,8 @@ export const api = {
   rateBuyer: (payload) => request("/orders/seller/ratings/buyer", { method: "POST", body: JSON.stringify(payload) }),
   flagUser: (payload) => request("/flags", { method: "POST", body: JSON.stringify(payload) }),
   reports: () => request("/flags/seller/reports"),
+  updateReportStatus: (id, status, resolutionNote = "") =>
+    request(`/flags/${id}/status`, { method: "PATCH", body: JSON.stringify({ status, resolutionNote }) }),
   myProfile: () => request("/users/seller/me/profile"),
   updateProfile: (payload) => request("/users/seller/me/profile", { method: "PATCH", body: JSON.stringify(payload) })
 };

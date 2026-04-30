@@ -19,7 +19,26 @@ const orderSchema = new mongoose.Schema(
       enum: ["Placed", "Processing", "Preparing", "Shipping", "Delivered", "Cancelled"],
       default: "Placed"
     },
-    totalPrice: { type: Number, required: true, min: 0 }
+    totalPrice: { type: Number, required: true, min: 0 },
+    paymentMethod: {
+      type: String,
+      enum: ["Cash on Delivery", "Card Payment", "Wallet"],
+      default: "Cash on Delivery"
+    },
+    paymentStatus: {
+      type: String,
+      enum: ["Pending", "Paid", "Failed", "Refunded"],
+      default: "Pending"
+    },
+    expectedDeliveryDays: {
+      type: Number,
+      min: 1,
+      default: 3
+    },
+    expectedDeliveryDate: {
+      type: Date,
+      default: null
+    }
   },
   { timestamps: true }
 );

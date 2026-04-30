@@ -7,10 +7,43 @@ const BuyerSellerRating = require("../models/BuyerSellerRating");
 const { auth } = require("../middleware/auth");
 
 const router = express.Router();
+const PAYMENT_METHODS = ["Cash on Delivery", "Card Payment", "Wallet"];
+
+function addDays(baseDate, days) {
+  const dt = new Date(baseDate);
+  dt.setDate(dt.getDate() + Number(days || 0));
+  return dt;
+}
+
+function normalizePaymentMethod(value) {
+  const candidate = String(value || "").trim();
+  return PAYMENT_METHODS.includes(candidate) ? candidate : "Cash on Delivery";
+}
+
+async function rollbackOrderStock(order) {
+  const updates = (order.products || []).map((item) => ({
+    updateOne: {
+      filter: {
+        _id: item.productId,
+        sellerId: order.sellerId
+      },
+      update: {
+        $inc: {
+          inventory: Number(item.quantity || 0),
+          orders: -Number(item.quantity || 0)
+        }
+      }
+    }
+  }));
+
+  if (updates.length) {
+    await Product.bulkWrite(updates);
+  }
+}
 
 router.post("/", auth("buyer"), async (req, res) => {
   try {
-    const { items } = req.body || {};
+    const { items, paymentMethod } = req.body || {};
     if (!Array.isArray(items) || !items.length) {
       return res.status(400).json({ message: "items[] is required" });
     }
@@ -23,6 +56,7 @@ router.post("/", auth("buyer"), async (req, res) => {
 
     const orderItems = [];
     let totalPrice = 0;
+    let expectedDeliveryDays = 1;
 
     for (const rawItem of items) {
       const p = productMap.get(String(rawItem.productId));
@@ -34,6 +68,7 @@ router.post("/", auth("buyer"), async (req, res) => {
       const quantity = Math.max(1, Number(rawItem.quantity || 1));
       orderItems.push({ productId: p._id, quantity, price: p.price });
       totalPrice += p.price * quantity;
+      expectedDeliveryDays = Math.max(expectedDeliveryDays, Number(p.deliveryDays || 1));
     }
 
     if (!orderItems.length) {
@@ -74,7 +109,11 @@ router.post("/", auth("buyer"), async (req, res) => {
       sellerId: firstSeller,
       products: orderItems,
       status: "Placed",
-      totalPrice
+      totalPrice,
+      paymentMethod: normalizePaymentMethod(paymentMethod),
+      paymentStatus: "Pending",
+      expectedDeliveryDays,
+      expectedDeliveryDate: addDays(new Date(), expectedDeliveryDays)
     });
 
     return res.status(201).json(order);
@@ -95,7 +134,7 @@ router.get("/buyer/me", auth("buyer"), async (req, res) => {
 
     const [sellers, products, sellerRatings] = await Promise.all([
       User.find({ _id: { $in: sellerIds } }).select("name").lean(),
-      Product.find({ _id: { $in: productIds } }).select("name imageUrl sellerId").lean(),
+      Product.find({ _id: { $in: productIds } }).select("name imageUrl sellerId deliveryDays").lean(),
       BuyerSellerRating.find({ orderId: { $in: orderIds }, buyerId: req.user.id }).lean()
     ]);
 
@@ -113,7 +152,8 @@ router.get("/buyer/me", auth("buyer"), async (req, res) => {
           productName: product?.name || "Product",
           imageUrl: product?.imageUrl || "",
           sellerId: product?.sellerId || order.sellerId,
-          sellerName: sellerMap.get(String(product?.sellerId || order.sellerId)) || "Seller"
+          sellerName: sellerMap.get(String(product?.sellerId || order.sellerId)) || "Seller",
+          deliveryDays: Number(product?.deliveryDays || order.expectedDeliveryDays || 1)
         };
       });
 
@@ -143,10 +183,38 @@ router.delete("/buyer/:id", auth("buyer"), async (req, res) => {
     const order = await Order.findOne({ _id: req.params.id, buyerId: req.user.id });
     if (!order) return res.status(404).json({ message: "Order not found" });
 
+    if (order.status !== "Cancelled") {
+      return res.status(400).json({ message: "Only cancelled orders can be removed from history" });
+    }
+
     await Order.deleteOne({ _id: order._id, buyerId: req.user.id });
-    return res.json({ message: "Order removed" });
+    return res.json({ message: "Cancelled order removed" });
   } catch (err) {
     return res.status(500).json({ message: "Failed to remove order", error: err.message });
+  }
+});
+
+router.patch("/buyer/:id/cancel", auth("buyer"), async (req, res) => {
+  try {
+    const order = await Order.findOne({ _id: req.params.id, buyerId: req.user.id });
+    if (!order) return res.status(404).json({ message: "Order not found" });
+
+    if (order.status === "Cancelled") {
+      return res.json(order);
+    }
+
+    const cancellableStatuses = ["Placed", "Processing", "Preparing"];
+    if (!cancellableStatuses.includes(order.status)) {
+      return res.status(400).json({ message: "Order can no longer be cancelled" });
+    }
+
+    await rollbackOrderStock(order);
+    order.status = "Cancelled";
+    await order.save();
+
+    return res.json(order);
+  } catch (err) {
+    return res.status(500).json({ message: "Failed to cancel order", error: err.message });
   }
 });
 
@@ -205,6 +273,14 @@ router.patch("/:id/status", auth("seller"), async (req, res) => {
 
     const order = await Order.findOne({ _id: req.params.id, sellerId: req.user.id });
     if (!order) return res.status(404).json({ message: "Order not found" });
+
+    if (order.status === "Cancelled" && status !== "Cancelled") {
+      return res.status(400).json({ message: "Cancelled orders cannot be reopened" });
+    }
+
+    if (status === "Cancelled" && order.status !== "Cancelled") {
+      await rollbackOrderStock(order);
+    }
 
     order.status = status;
     await order.save();
