@@ -12,11 +12,52 @@ router.post("/", auth(), async (req, res) => {
       return res.status(400).json({ message: "productId, text, rating are required" });
     }
 
+    const normalizedRating = Number(rating);
+    if (!Number.isFinite(normalizedRating) || normalizedRating < 1 || normalizedRating > 5) {
+      return res.status(400).json({ message: "rating must be between 1 and 5" });
+    }
+
+    const existing = await Comment.findOne({ productId, userId: req.user.id });
+    if (existing) {
+      if (Number(existing.rating) === normalizedRating) {
+        return res.status(409).json({ message: "You already reviewed this product with the same rating" });
+      }
+
+      existing.text = String(text).trim();
+      existing.rating = normalizedRating;
+      await existing.save();
+
+      const stats = await Comment.aggregate([
+        { $match: { productId: existing.productId } },
+        {
+          $group: {
+            _id: "$productId",
+            averageRating: { $avg: "$rating" },
+            reviewCount: { $sum: 1 }
+          }
+        }
+      ]);
+
+      if (stats.length) {
+        await Product.updateOne(
+          { _id: existing.productId },
+          {
+            $set: {
+              ratings: Number(stats[0].averageRating || 0),
+              reviewCount: Number(stats[0].reviewCount || 0)
+            }
+          }
+        );
+      }
+
+      return res.json(existing);
+    }
+
     const comment = await Comment.create({
       productId,
       userId: req.user.id,
       text: String(text).trim(),
-      rating: Number(rating)
+      rating: normalizedRating
     });
 
     const stats = await Comment.aggregate([

@@ -24,7 +24,7 @@ seller-app/.env.*
 !seller-app/.env.example
 
 # Runtime uploads and generated assets
-uploads/
+backend/uploads/
 
 # Logs
 npm-debug.log*
