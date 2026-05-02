@@ -893,52 +893,90 @@ function BuyerAppShell() {
 
             {displayedOrders.length ? displayedOrders.map((order) => (
               <article key={order._id} className="order-card">
-                <h2 className="order-card__title">{order.productName || `Order ${String(order._id).slice(-6)}`}</h2>
-                <div className={`order-status ${order.status === "Delivered" ? "order-status--delivered" : order.status === "Shipping" ? "order-status--shipping" : "order-status--processing"}`}>
-                  {order.status}
-                </div>
-                <p style={{ color: "var(--text-muted)", marginBottom: 8 }}>Seller: {order.sellerName || order.sellerId}</p>
-                <p style={{ marginBottom: 12 }}>Total: <strong>{money(order.totalPrice)}</strong></p>
-                <p style={{ color: "var(--text-muted)", marginBottom: 12 }}>
-                  Expected delivery: {formatDate(resolveExpectedDeliveryDate(order))}
-                </p>
-                <div className="tracking-line">
-                  <div className={`tracking-step ${["Placed", "Processing", "Preparing", "Shipping", "Delivered"].includes(order.status) ? "active" : ""}`}>Placed</div>
-                  <div className={`tracking-step ${["Processing", "Preparing", "Shipping", "Delivered"].includes(order.status) ? "active" : ""}`}>Processing</div>
-                  <div className={`tracking-step ${["Shipping", "Delivered"].includes(order.status) ? "active" : ""}`}>Shipping</div>
-                  <div className={`tracking-step ${order.status === "Delivered" ? "active" : ""}`}>Delivered</div>
+                <div className="order-card__header">
+                  <div className="order-card__image-container">
+                    <img 
+                      className="order-card__image" 
+                      src={resolveImageUrl(order.itemsDetailed?.[0]?.imageUrl || "")} 
+                      alt={order.productName || "Product"}
+                    />
+                  </div>
+                  <div className="order-card__content">
+                    <h3 className="order-card__title">{order.productName || `Order ${String(order._id).slice(-6)}`}</h3>
+                    <div className="order-card__meta">
+                      <div className={`order-status ${order.status === "Delivered" ? "order-status--delivered" : order.status === "Cancelled" ? "order-status--cancelled" : order.status === "Shipping" ? "order-status--shipping" : "order-status--processing"}`}>
+                        {order.status}
+                      </div>
+                      <span className="order-card__meta-item">📦 Order #{String(order._id).slice(-6)}</span>
+                    </div>
+                    <div className="order-card__meta">
+                      <span className="order-card__meta-item">Seller: <span className="order-card__seller">{order.sellerName || order.sellerId}</span></span>
+                    </div>
+                    <div className="order-card__price-info">
+                      <span className="order-card__price">{money(order.totalPrice)}</span>
+                      <span className="order-card__delivery">📅 {formatDate(resolveExpectedDeliveryDate(order))}</span>
+                    </div>
+                  </div>
                 </div>
 
-                <div className="comment-section">
-                  <button type="button" className="btn" style={{ background: "#dbeafe", marginBottom: 12 }} onClick={() => { setTrackingOrderId(order._id); setScreen("tracking"); }}>
-                    Open Tracking Timeline
-                  </button>
+                <div className="order-card__tracking">
+                  <div className={`order-card__tracking-step ${["Placed", "Processing", "Preparing", "Shipping", "Delivered"].includes(order.status) ? "active" : ""}`}>
+                    <div className="order-card__tracking-dot" />
+                    <div>Placed</div>
+                  </div>
+                  <div className={`order-card__tracking-step ${["Processing", "Preparing", "Shipping", "Delivered"].includes(order.status) ? "active" : ""}`}>
+                    <div className="order-card__tracking-dot" />
+                    <div>Processing</div>
+                  </div>
+                  <div className={`order-card__tracking-step ${["Preparing", "Shipping", "Delivered"].includes(order.status) ? "active" : ""}`}>
+                    <div className="order-card__tracking-dot" />
+                    <div>Preparing</div>
+                  </div>
+                  <div className={`order-card__tracking-step ${order.status === "Delivered" ? "active" : ""}`}>
+                    <div className="order-card__tracking-dot" />
+                    <div>Delivered</div>
+                  </div>
+                </div>
 
-                  <select
-                    className="search-bar"
-                    value={String(ratingForms[order._id]?.rating || order.sellerRating?.rating || 5)}
-                    onChange={(e) => setRatingForms((prev) => ({ ...prev, [order._id]: { ...(prev[order._id] || {}), rating: Number(e.target.value) } }))}
-                  >
-                    <option value="1">1 Star</option>
-                    <option value="2">2 Stars</option>
-                    <option value="3">3 Stars</option>
-                    <option value="4">4 Stars</option>
-                    <option value="5">5 Stars</option>
-                  </select>
-                  <textarea
-                    className="comment-box"
-                    rows={3}
-                    placeholder="Write feedback about this seller"
-                    value={ratingForms[order._id]?.comment ?? order.sellerRating?.comment ?? ""}
-                    onChange={(e) => setRatingForms((prev) => ({ ...prev, [order._id]: { ...(prev[order._id] || {}), comment: e.target.value } }))}
-                  />
-                  <button type="button" className="rate-btn" onClick={() => submitSellerRating(order)}>Rate Seller</button>
-                  <button type="button" className="btn" style={{ background: "#fee2e2", marginTop: 10 }} onClick={() => cancelOrRemoveOrder(order)}>
-                    {order.status === "Cancelled" ? "Remove Cancelled Order" : "Cancel Order"}
+                <div className="order-card__actions">
+                  <button type="button" className="order-card__action-btn order-card__action-btn--primary" onClick={() => { setTrackingOrderId(order._id); setScreen("tracking"); }}>
+                    Track
                   </button>
+                  <button type="button" className="order-card__action-btn order-card__action-btn--secondary" onClick={() => { setReportForm({ ...reportForm, orderId: order._id, sellerId: order.sellerId }); setScreen("report"); }}>
+                    Report
+                  </button>
+                  <button type="button" className="order-card__action-btn order-card__action-btn--danger" onClick={() => cancelOrRemoveOrder(order)}>
+                    {order.status === "Cancelled" ? "Remove" : "Cancel"}
+                  </button>
+                </div>
+
+                <div className="order-card__expanded">
+                  <div className="order-card__rating-section">
+                    <div className="order-card__rating-label">Rate Seller</div>
+                    <select
+                      className="order-card__rating-select"
+                      value={String(ratingForms[order._id]?.rating || order.sellerRating?.rating || 5)}
+                      onChange={(e) => setRatingForms((prev) => ({ ...prev, [order._id]: { ...(prev[order._id] || {}), rating: Number(e.target.value) } }))}
+                    >
+                      <option value="1">⭐ 1 Star</option>
+                      <option value="2">⭐⭐ 2 Stars</option>
+                      <option value="3">⭐⭐⭐ 3 Stars</option>
+                      <option value="4">⭐⭐⭐⭐ 4 Stars</option>
+                      <option value="5">⭐⭐⭐⭐⭐ 5 Stars</option>
+                    </select>
+                    <textarea
+                      className="order-card__comment-textarea"
+                      placeholder="Share your feedback about this seller..."
+                      value={ratingForms[order._id]?.comment ?? order.sellerRating?.comment ?? ""}
+                      onChange={(e) => setRatingForms((prev) => ({ ...prev, [order._id]: { ...(prev[order._id] || {}), comment: e.target.value } }))}
+                    />
+                    <button type="button" className="order-card__action-btn order-card__action-btn--primary" style={{ marginTop: 10, width: "100%" }} onClick={() => submitSellerRating(order)}>
+                      Submit Rating
+                    </button>
+                  </div>
                 </div>
               </article>
-            )) : <div className="product-details">No orders found for this filter.</div>}
+            )) : <div className="order-card__no-orders">📭 No orders found for this filter.</div>}
           </div>
         ) : null}
       </div>
