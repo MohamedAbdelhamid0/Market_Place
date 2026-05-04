@@ -217,7 +217,6 @@ const ProductCard = memo(function ProductCard({ product, inWishlist, onAddToCart
         <button type="button" className="btn" style={{ background: inWishlist ? "#fecdd3" : "#e2e8f0", marginTop: 8 }} onClick={(e) => { e.stopPropagation(); onToggleWishlist(product); }}>
           {inWishlist ? "Remove Wishlist" : "Wishlist"}
         </button>
-        <button type="button" className="btn" style={{ background: "#dbeafe", marginTop: 8 }} onClick={(e) => { e.stopPropagation(); onOrderNow(product); }}>Order Now</button>
       </div>
     </article>
   );
@@ -239,6 +238,7 @@ function BuyerAppShell() {
   const [minRating, setMinRating] = useState("0");
   const [orderFilter, setOrderFilter] = useState("All");
   const [paymentMethod, setPaymentMethod] = useState("Cash on Delivery");
+  const [cardDetails, setCardDetails] = useState({ cardNumber: "", cardHolder: "", cardExpiry: "", cardCVV: "" });
   const [reportForm, setReportForm] = useState({ orderId: "", sellerId: "", reasonType: "Late Delivery", reason: "" });
   const [ratingForms, setRatingForms] = useState({});
   const [toasts, setToasts] = useState([]);
@@ -565,7 +565,16 @@ function BuyerAppShell() {
         pushToast("Your cart is empty", "info");
         return;
       }
-      await api.checkoutCart({ paymentMethod });
+      if (paymentMethod === "Credit Card") {
+        const { cardNumber, cardHolder, cardExpiry, cardCVV } = cardDetails;
+        if (!cardNumber || !cardHolder || !cardExpiry || !cardCVV) {
+          pushToast("Please fill in all credit card details", "error");
+          return;
+        }
+      }
+      const payload = { paymentMethod };
+      if (paymentMethod === "Credit Card") payload.cardDetails = cardDetails;
+      await api.checkoutCart(payload);
       await refreshAll();
       setScreen("orders");
       pushToast("Checkout successful", "success");
@@ -806,7 +815,6 @@ function BuyerAppShell() {
 
                 <div className="detail-actions">
                   <button type="button" className="btn order-btn" onClick={() => onAddToCart(productDetail.product)}>Add to Cart</button>
-                  <button type="button" className="btn" style={{ background: "#dbeafe" }} onClick={() => onOrderNow(productDetail.product)}>Order Now</button>
                 </div>
 
                 <div className="detail-rating">
@@ -868,12 +876,60 @@ function BuyerAppShell() {
 
             <div className="product-details" style={{ marginTop: 16 }}>
               <h2 style={{ marginBottom: 10 }}>Payment and Checkout</h2>
-              <select className="search-bar" value={paymentMethod} onChange={(e) => setPaymentMethod(e.target.value)}>
+              <select className="search-bar" value={paymentMethod} onChange={(e) => { setPaymentMethod(e.target.value); setCardDetails({ cardNumber: "", cardHolder: "", cardExpiry: "", cardCVV: "" }); }}>
                 <option>Cash on Delivery</option>
-                <option>Card Payment</option>
-                <option>Wallet</option>
+                <option>Credit Card</option>
               </select>
-              <p style={{ marginBottom: 12 }}>Subtotal: <strong>{money(cart.subtotal)}</strong></p>
+
+              {paymentMethod === "Credit Card" && (
+                <div style={{ marginTop: 12, padding: 14, background: "#f0f9ff", borderRadius: 8, border: "1px solid #bae6fd" }}>
+                  <p style={{ fontWeight: 600, marginBottom: 10 }}>💳 Credit Card Details</p>
+                  <input
+                    className="search-bar"
+                    placeholder="Card Number (16 digits)"
+                    maxLength={19}
+                    value={cardDetails.cardNumber}
+                    onChange={(e) => {
+                      const raw = e.target.value.replace(/\D/g, "").slice(0, 16);
+                      const formatted = raw.replace(/(.{4})/g, "$1 ").trim();
+                      setCardDetails((prev) => ({ ...prev, cardNumber: formatted }));
+                    }}
+                    style={{ marginBottom: 8 }}
+                  />
+                  <input
+                    className="search-bar"
+                    placeholder="Card Holder Name"
+                    value={cardDetails.cardHolder}
+                    onChange={(e) => setCardDetails((prev) => ({ ...prev, cardHolder: e.target.value }))}
+                    style={{ marginBottom: 8 }}
+                  />
+                  <div style={{ display: "flex", gap: 8 }}>
+                    <input
+                      className="search-bar"
+                      placeholder="MM/YY"
+                      maxLength={5}
+                      value={cardDetails.cardExpiry}
+                      onChange={(e) => {
+                        let val = e.target.value.replace(/\D/g, "").slice(0, 4);
+                        if (val.length >= 3) val = val.slice(0, 2) + "/" + val.slice(2);
+                        setCardDetails((prev) => ({ ...prev, cardExpiry: val }));
+                      }}
+                      style={{ flex: 1 }}
+                    />
+                    <input
+                      className="search-bar"
+                      placeholder="CVV"
+                      maxLength={4}
+                      type="password"
+                      value={cardDetails.cardCVV}
+                      onChange={(e) => setCardDetails((prev) => ({ ...prev, cardCVV: e.target.value.replace(/\D/g, "").slice(0, 4) }))}
+                      style={{ flex: 1 }}
+                    />
+                  </div>
+                </div>
+              )}
+
+              <p style={{ marginBottom: 12, marginTop: 12 }}>Subtotal: <strong>{money(cart.subtotal)}</strong></p>
               <button type="button" className="btn order-btn" onClick={checkoutCart}>Process Order</button>
               <button type="button" className="btn" style={{ background: "#e2e8f0", marginTop: 10 }} onClick={clearCart}>Clear Cart</button>
             </div>
