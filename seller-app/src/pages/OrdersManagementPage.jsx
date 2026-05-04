@@ -5,9 +5,10 @@ const statuses = ["Placed", "Processing", "Preparing", "Shipping", "Delivered", 
 
 export default function OrdersManagementPage() {
   const [orders, setOrders] = useState([]);
-  const [details, setDetails] = useState("");
+  const [flagDetails, setFlagDetails] = useState({});   // per-order flag details
+  const [flagged, setFlagged] = useState({});           // tracks already-flagged orders
   const [ratingDrafts, setRatingDrafts] = useState({});
-  const [message, setMessage] = useState("");
+  const [message, setMessage] = useState({ text: "", type: "success" });
 
   async function load() {
     const data = await api.myOrders();
@@ -18,32 +19,46 @@ export default function OrdersManagementPage() {
     load().catch(console.error);
   }, []);
 
+  function showMessage(text, type = "success") {
+    setMessage({ text, type });
+    setTimeout(() => setMessage({ text: "", type: "success" }), 3000);
+  }
+
   async function updateStatus(orderId, status) {
-    await api.updateOrderStatus(orderId, status);
-    setMessage(`Order #${String(orderId).slice(-6)} updated to ${status}`);
-    await load();
+    try {
+      await api.updateOrderStatus(orderId, status);
+      showMessage(`Order #${String(orderId).slice(-6)} updated to ${status}`);
+      await load();
+    } catch (err) {
+      showMessage(err.message || "Failed to update status", "error");
+    }
   }
 
   async function flagBuyer(order) {
-    await api.flagUser({
-      reportedUserId: order.buyerId,
-      reason: "Package Not Received",
-      details,
-      orderId: order._id
-    });
-    setMessage(`Buyer from order #${String(order._id).slice(-6)} flagged`);
-    setDetails("");
+    try {
+      const details = flagDetails[order._id] || "";
+      await api.flagUser({
+        reportedUserId: order.buyerId,
+        reason: "Package Not Received",
+        details,
+        orderId: order._id
+      });
+      setFlagged((prev) => ({ ...prev, [order._id]: true }));
+      setFlagDetails((prev) => ({ ...prev, [order._id]: "" }));
+      showMessage(`Buyer flagged for order #${String(order._id).slice(-6)}`);
+    } catch (err) {
+      showMessage(err.message || "Failed to flag buyer", "error");
+    }
   }
 
   async function rateBuyer(order, rating, comment) {
-    await api.rateBuyer({
-      orderId: order._id,
-      buyerId: order.buyerId,
-      rating,
-      comment
-    });
-    setMessage(`Buyer rating saved for order #${String(order._id).slice(-6)}`);
-    await load();
+    try {
+      await api.rateBuyer({ orderId: order._id, buyerId: order.buyerId, rating, comment });
+      showMessage(`Buyer rating saved for order #${String(order._id).slice(-6)}`);
+      await load();
+    } catch (err) {
+      showMessage(err.message || "Failed to rate buyer", "error");
+    }
   }
 
   function getRatingDraft(order) {
@@ -55,44 +70,58 @@ export default function OrdersManagementPage() {
     };
   }
 
+  // Only eligible to flag if order is in Shipping or Delivered status
+  function canFlagBuyer(order) {
+    return ["Shipping", "Delivered"].includes(order.status);
+  }
+
   return (
     <>
       <div className="header">
         <div className="header-title">
           <h1>Orders Management</h1>
-          <p>Update order status, rate buyers, and report issues</p>
+          <p>Update order status, rate buyers, and report non-receipt issues</p>
         </div>
       </div>
 
-      {message ? <div className="alert success" style={{ marginBottom: 16 }}>{message}</div> : null}
-
-      <div className="form-row">
-        <div className="form-group">
-          <label>Flag Type</label>
-          <input value="Package Not Received" disabled />
+      {message.text ? (
+        <div className="alert" style={{
+          marginBottom: 16,
+          background: message.type === "error" ? "#fee2e2" : "#dcfce7",
+          color: message.type === "error" ? "#b91c1c" : "#15803d",
+          padding: "10px 14px",
+          borderRadius: 8
+        }}>
+          {message.text}
         </div>
-        <div className="form-group">
-          <label>Flag Details</label>
-          <input placeholder="Optional supporting details" value={details} onChange={(e) => setDetails(e.target.value)} />
-        </div>
-      </div>
+      ) : null}
 
       <div className="orders-list">
-        {orders.map((order) => (
+        {orders.length ? orders.map((order) => (
           <div className="order-card" key={order._id}>
             <div className="order-info">
               <h3>Order #{String(order._id).slice(-6)}</h3>
               <div className="order-meta">Buyer: {order.buyerName || "Unknown"}</div>
               <div className="order-meta">Product: {order.product || "Unknown"}</div>
+              <div className="order-meta" style={{ fontSize: 12, color: order.paymentStatus === "Paid" ? "#15803d" : "#d97706" }}>
+                Payment: {order.paymentStatus || "Pending"} ({order.paymentMethod || "Cash on Delivery"})
+              </div>
             </div>
 
             <div className="order-actions">
+              {/* Status update */}
               <div className="form-group">
-                <label>Status</label>
-                <select className="order-status-select" value={order.status} onChange={(e) => updateStatus(order._id, e.target.value)}>
-                  {statuses.map((status) => <option key={status} value={status}>{status}</option>)}
+                <label>Order Status</label>
+                <select
+                  className="order-status-select"
+                  value={order.status}
+                  onChange={(e) => updateStatus(order._id, e.target.value)}
+                >
+                  {statuses.map((s) => <option key={s} value={s}>{s}</option>)}
                 </select>
               </div>
+
+              {/* Buyer rating */}
               <div className="form-group">
                 <label>Buyer Rating</label>
                 <select
@@ -105,11 +134,9 @@ export default function OrdersManagementPage() {
                   }
                 >
                   <option value="">Rate buyer...</option>
-                  <option value="1">1 - Poor</option>
-                  <option value="2">2 - Fair</option>
-                  <option value="3">3 - Good</option>
-                  <option value="4">4 - Very Good</option>
-                  <option value="5">5 - Excellent</option>
+                  {[1, 2, 3, 4, 5].map((n) => (
+                    <option key={n} value={n}>{n} - {["Poor", "Fair", "Good", "Very Good", "Excellent"][n - 1]}</option>
+                  ))}
                 </select>
               </div>
               <div className="form-group">
@@ -125,6 +152,35 @@ export default function OrdersManagementPage() {
                   }
                 />
               </div>
+
+              {/* Per-order flag section — only visible for Shipping/Delivered */}
+              {canFlagBuyer(order) && (
+                <div style={{ marginTop: 8, padding: "10px 12px", background: "#fff7ed", borderRadius: 8, border: "1px solid #fed7aa" }}>
+                  <p style={{ fontSize: 12, fontWeight: 600, color: "#c2410c", marginBottom: 6 }}>
+                    📦 Flag buyer for package not received
+                  </p>
+                  {flagged[order._id] ? (
+                    <p style={{ fontSize: 12, color: "#15803d" }}>✅ Buyer has been flagged for this order</p>
+                  ) : (
+                    <>
+                      <input
+                        placeholder="Details about non-receipt (optional)"
+                        value={flagDetails[order._id] || ""}
+                        onChange={(e) =>
+                          setFlagDetails((prev) => ({ ...prev, [order._id]: e.target.value }))
+                        }
+                        style={{ marginBottom: 6, fontSize: 13 }}
+                      />
+                      <button
+                        className="btn-flag"
+                        onClick={() => flagBuyer(order)}
+                      >
+                        Flag Buyer
+                      </button>
+                    </>
+                  )}
+                </div>
+              )}
             </div>
 
             <div className="order-footer">
@@ -135,21 +191,24 @@ export default function OrdersManagementPage() {
                   onClick={() => {
                     const draft = getRatingDraft(order);
                     const rating = Number(draft.rating || 0);
-                    const comment = draft.comment || "";
                     if (!rating || rating < 1 || rating > 5) {
-                      setMessage("Please select rating 1-5 before saving");
+                      showMessage("Please select a rating 1–5 before saving", "error");
                       return;
                     }
-                    rateBuyer(order, rating, comment).catch((err) => setMessage(err.message));
+                    rateBuyer(order, rating, draft.comment || "");
                   }}
                 >
                   Save Buyer Rating
                 </button>
-                <button className="btn-flag" onClick={() => flagBuyer(order).catch((err) => setMessage(err.message))}>Flag Buyer</button>
               </div>
             </div>
           </div>
-        ))}
+        )) : (
+          <div className="empty-message">
+            <div className="empty-message-icon">📭</div>
+            <p>No orders yet</p>
+          </div>
+        )}
       </div>
     </>
   );

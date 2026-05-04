@@ -77,6 +77,7 @@ export const api = {
   reports: () => request("/flags/seller/reports"),
   updateReportStatus: (id, status, resolutionNote = "") =>
     request(`/flags/${id}/status`, { method: "PATCH", body: JSON.stringify({ status, resolutionNote }) }),
+  deleteFlag: (id) => request(`/flags/${id}`, { method: "DELETE" }),
   myProfile: () => request("/users/seller/me/profile"),
   updateProfile: (payload) => request("/users/seller/me/profile", { method: "PATCH", body: JSON.stringify(payload) })
 };

@@ -240,6 +240,8 @@ function BuyerAppShell() {
   const [paymentMethod, setPaymentMethod] = useState("Cash on Delivery");
   const [cardDetails, setCardDetails] = useState({ cardNumber: "", cardHolder: "", cardExpiry: "", cardCVV: "" });
   const [reportForm, setReportForm] = useState({ orderId: "", sellerId: "", reasonType: "Late Delivery", reason: "" });
+  const [myFlags, setMyFlags] = useState([]);
+  const [reportTab, setReportTab] = useState("submit");
   const [ratingForms, setRatingForms] = useState({});
   const [toasts, setToasts] = useState([]);
   const [visibleCount, setVisibleCount] = useState(12);
@@ -257,18 +259,20 @@ function BuyerAppShell() {
 
   async function refreshAll() {
     try {
-      const [productsData, ordersData, cartData, wishlistData, profileData] = await Promise.all([
+      const [productsData, ordersData, cartData, wishlistData, profileData, flagsData] = await Promise.all([
         api.products(),
         api.buyerOrders(),
         api.cart(),
         api.wishlist(),
-        api.buyerProfile()
+        api.buyerProfile(),
+        api.myFlags().catch(() => [])
       ]);
 
       setProducts(Array.isArray(productsData) ? productsData : []);
       setOrders(Array.isArray(ordersData) ? ordersData : []);
       setCart(cartData || { items: [], subtotal: 0, itemCount: 0 });
       setWishlist(Array.isArray(wishlistData) ? wishlistData : []);
+      setMyFlags(Array.isArray(flagsData) ? flagsData : []);
       setProfile((prev) => ({
         ...prev,
         name: profileData?.name || prev.name,
@@ -672,12 +676,6 @@ function BuyerAppShell() {
         return;
       }
 
-      const selectedOrder = orders.find((order) => String(order._id) === String(reportForm.orderId));
-      if (reportForm.reasonType === "Late Delivery" && !canFlagLateDelivery(selectedOrder)) {
-        pushToast(`Late-delivery flags are allowed only after expected date + ${LATE_DELIVERY_GRACE_DAYS} days`, "info");
-        return;
-      }
-
       await api.flagUser({
         reportedUserId: reportForm.sellerId,
         reason: reportForm.reasonType,
@@ -686,7 +684,10 @@ function BuyerAppShell() {
       });
 
       setReportForm({ orderId: "", sellerId: "", reasonType: "Late Delivery", reason: "" });
-      pushToast("Report submitted", "success");
+      const flagsData = await api.myFlags().catch(() => []);
+      setMyFlags(Array.isArray(flagsData) ? flagsData : []);
+      pushToast("Report submitted successfully", "success");
+      setReportTab("history");
     } catch (err) {
       pushToast(err.message || "Failed to submit report", "error");
     }
@@ -1152,46 +1153,155 @@ function BuyerAppShell() {
       <div className={`screen ${screen === "report" ? "active" : ""}`} id="report">
         {screen === "report" ? (
           <div>
-            <h1 className="header">Report</h1>
-            <div className="report-box">
-              <div className="form-group">
-                <label htmlFor="report-order">Order</label>
-                <select id="report-order" className="search-bar" value={reportForm.orderId} onChange={(e) => {
-                  setReportForm((prev) => ({ ...prev, orderId: e.target.value, sellerId: "" }));
-                }}>
-                  <option value="">Select order</option>
-                  {orders.map((order) => (
-                    <option key={order._id} value={order._id}>#{String(order._id).slice(-6)} - {order.productName || "Order"}</option>
-                  ))}
-                </select>
-              </div>
+            <h1 className="header">Reports</h1>
 
-              <div className="form-group">
-                <label htmlFor="report-seller">Seller</label>
-                <select id="report-seller" className="search-bar" value={reportForm.sellerId} onChange={(e) => setReportForm((prev) => ({ ...prev, sellerId: e.target.value }))}>
-                  <option value="">Select seller</option>
-                  {reportSellerOptions.map((seller) => (
-                    <option key={seller.sellerId} value={seller.sellerId}>{seller.sellerName}</option>
-                  ))}
-                </select>
-              </div>
-
-              <div className="form-group">
-                <label htmlFor="report-type">Report Type</label>
-                <select id="report-type" className="search-bar" value={reportForm.reasonType} onChange={(e) => setReportForm((prev) => ({ ...prev, reasonType: e.target.value }))}>
-                  <option value="Late Delivery">Late Delivery</option>
-                  <option value="Buyer Report">Other Seller Issue</option>
-                </select>
-              </div>
-
-              <div className="form-group">
-                <label htmlFor="report-reason">Reason</label>
-                <textarea id="report-reason" rows={4} value={reportForm.reason} onChange={(e) => setReportForm((prev) => ({ ...prev, reason: e.target.value }))} placeholder="Describe the issue with this seller" />
-              </div>
-
-              <button type="button" className="btn order-btn" onClick={submitReport}>Submit Report</button>
-              <p className="report-notice">If an order has multiple sellers, choose the exact seller above before submitting.</p>
+            {/* Tabs */}
+            <div style={{ display: "flex", gap: 8, marginBottom: 20 }}>
+              {["submit", "history"].map((tab) => (
+                <button
+                  key={tab}
+                  type="button"
+                  onClick={async () => {
+                    setReportTab(tab);
+                    if (tab === "history") {
+                      try {
+                        const flagsData = await api.myFlags();
+                        setMyFlags(Array.isArray(flagsData) ? flagsData : []);
+                      } catch (err) {
+                        pushToast(err.message || "Failed to load reports", "error");
+                      }
+                    }
+                  }}
+                  style={{
+                    padding: "8px 20px",
+                    borderRadius: 8,
+                    border: "none",
+                    fontWeight: 600,
+                    cursor: "pointer",
+                    background: reportTab === tab ? "#1e3a5f" : "#e2e8f0",
+                    color: reportTab === tab ? "white" : "#374151"
+                  }}
+                >
+                  {tab === "submit" ? "🚩 Submit Report" : `📋 My Reports (${myFlags.length})`}
+                </button>
+              ))}
             </div>
+
+            {reportTab === "history" && (
+              <button
+                type="button"
+                onClick={async () => {
+                  try {
+                    const flagsData = await api.myFlags();
+                    setMyFlags(Array.isArray(flagsData) ? flagsData : []);
+                  } catch (err) {
+                    pushToast(err.message || "Failed to load reports", "error");
+                  }
+                }}
+                style={{ marginBottom: 12, padding: "6px 14px", borderRadius: 6, border: "1px solid #e2e8f0", background: "white", cursor: "pointer", fontSize: 13 }}
+              >
+                🔄 Refresh
+              </button>
+            )}
+
+            {reportTab === "submit" ? (
+              <div className="report-box">
+                <div className="form-group">
+                  <label htmlFor="report-order">Order</label>
+                  <select id="report-order" className="search-bar" value={reportForm.orderId} onChange={(e) => {
+                    setReportForm((prev) => ({ ...prev, orderId: e.target.value, sellerId: "" }));
+                  }}>
+                    <option value="">Select order</option>
+                    {orders
+                      .filter((o) => o.status !== "Cancelled")
+                      .map((order) => (
+                        <option key={order._id} value={order._id}>
+                          #{String(order._id).slice(-6)} - {order.productName || "Order"} [{order.status}]
+                        </option>
+                      ))}
+                  </select>
+                </div>
+
+                <div className="form-group">
+                  <label htmlFor="report-seller">Seller</label>
+                  <select id="report-seller" className="search-bar" value={reportForm.sellerId} onChange={(e) => setReportForm((prev) => ({ ...prev, sellerId: e.target.value }))}>
+                    <option value="">Select seller</option>
+                    {reportSellerOptions.map((seller) => (
+                      <option key={seller.sellerId} value={seller.sellerId}>{seller.sellerName}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="form-group">
+                  <label htmlFor="report-type">Report Type</label>
+                  <select id="report-type" className="search-bar" value={reportForm.reasonType} onChange={(e) => setReportForm((prev) => ({ ...prev, reasonType: e.target.value }))}>
+                    <option value="Late Delivery">Late Delivery</option>
+                    <option value="Buyer Report">Other Seller Issue</option>
+                  </select>
+                </div>
+
+                <div className="form-group">
+                  <label htmlFor="report-reason">Details</label>
+                  <textarea id="report-reason" rows={4} value={reportForm.reason} onChange={(e) => setReportForm((prev) => ({ ...prev, reason: e.target.value }))} placeholder="Describe the issue in detail..." />
+                </div>
+
+                <button type="button" className="btn order-btn" onClick={submitReport}>Submit Report</button>
+                <p className="report-notice">If an order has multiple sellers, choose the exact seller above before submitting.</p>
+              </div>
+            ) : (
+              <div>
+                {myFlags.length ? myFlags.map((flag) => {
+                  const isFiled = String(flag.reportedBy?._id || flag.reportedBy) === String(user?.id);
+                  const statusColors = {
+                    Open: { background: "#fee2e2", color: "#b91c1c" },
+                    UnderReview: { background: "#fef9c3", color: "#92400e" },
+                    Resolved: { background: "#dcfce7", color: "#15803d" },
+                    Dismissed: { background: "#f1f5f9", color: "#64748b" }
+                  };
+                  const style = statusColors[flag.status] || statusColors.Open;
+                  return (
+                    <div key={flag._id} className="order-card" style={{ borderLeft: `4px solid ${style.color}`, marginBottom: 12 }}>
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: 8 }}>
+                        <div>
+                          <strong>{flag.reason}</strong>
+                          <div style={{ fontSize: 12, marginTop: 4 }}>
+                            <span style={{
+                              padding: "2px 8px",
+                              borderRadius: 10,
+                              background: isFiled ? "#dbeafe" : "#fce7f3",
+                              color: isFiled ? "#1d4ed8" : "#be185d",
+                              fontWeight: 600
+                            }}>
+                              {isFiled ? "📤 Filed by you" : "📥 Against you"}
+                            </span>
+                          </div>
+                        </div>
+                        <span style={{ padding: "4px 12px", borderRadius: 12, fontSize: 12, fontWeight: 700, ...style }}>
+                          {flag.status}
+                        </span>
+                      </div>
+                      <div style={{ marginTop: 8, fontSize: 13, color: "#6b7280", display: "flex", flexDirection: "column", gap: 3 }}>
+                        {isFiled
+                          ? <span>Against seller: <strong>{flag.reportedUserId?.name || "Unknown"}</strong></span>
+                          : <span>Filed by: <strong>{flag.reportedBy?.name || "Unknown"}</strong></span>
+                        }
+                        {flag.orderId && <span>Order: <strong>#{String(flag.orderId).slice(-6)}</strong></span>}
+                        {flag.details && <span>Details: {flag.details}</span>}
+                        {flag.resolutionNote && (
+                          <span style={{ color: "#15803d" }}>Resolution: {flag.resolutionNote}</span>
+                        )}
+                        <span>Submitted: {new Date(flag.createdAt).toLocaleDateString()}</span>
+                      </div>
+                    </div>
+                  );
+                }) : (
+                  <div style={{ textAlign: "center", padding: 40, color: "#9ca3af" }}>
+                    <div style={{ fontSize: 32 }}>📭</div>
+                    <p>No reports submitted yet</p>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         ) : null}
       </div>

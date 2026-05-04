@@ -62,6 +62,7 @@ export const api = {
   addComment: (payload) => request("/comments", { method: "POST", body: JSON.stringify(payload) }),
   summary: (productId) => request(`/comments/product/${productId}/summarize`),
   flagUser: (payload) => request("/flags", { method: "POST", body: JSON.stringify(payload) }),
+  myFlags: () => request("/flags/buyer/my-flags"),
   buyerProfile: () => request("/users/buyer/me/profile"),
   updateBuyerProfile: (payload) => request("/users/buyer/me/profile", { method: "PATCH", body: JSON.stringify(payload) }),
   addAddress: (payload) => request("/users/buyer/me/addresses", { method: "POST", body: JSON.stringify(payload) }),
