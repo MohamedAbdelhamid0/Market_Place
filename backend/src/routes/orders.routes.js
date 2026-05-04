@@ -7,7 +7,7 @@ const BuyerSellerRating = require("../models/BuyerSellerRating");
 const { auth } = require("../middleware/auth");
 
 const router = express.Router();
-const PAYMENT_METHODS = ["Cash on Delivery", "Card Payment", "Wallet"];
+const PAYMENT_METHODS = ["Cash on Delivery", "Credit Card"];
 
 function addDays(baseDate, days) {
   const dt = new Date(baseDate);
@@ -18,6 +18,20 @@ function addDays(baseDate, days) {
 function normalizePaymentMethod(value) {
   const candidate = String(value || "").trim();
   return PAYMENT_METHODS.includes(candidate) ? candidate : "Cash on Delivery";
+}
+
+function validateCardDetails(cardDetails) {
+  if (!cardDetails) return "Card details are required for Credit Card payment";
+  const { cardNumber, cardHolder, cardExpiry, cardCVV } = cardDetails;
+  if (!cardNumber || !/^\d{16}$/.test(cardNumber.replace(/\s/g, "")))
+    return "Card number must be 16 digits";
+  if (!cardHolder || !cardHolder.trim())
+    return "Card holder name is required";
+  if (!cardExpiry || !/^(0[1-9]|1[0-2])\/\d{2}$/.test(cardExpiry))
+    return "Expiry must be in MM/YY format";
+  if (!cardCVV || !/^\d{3,4}$/.test(cardCVV))
+    return "CVV must be 3 or 4 digits";
+  return null;
 }
 
 async function rollbackOrderStock(order) {
@@ -43,9 +57,15 @@ async function rollbackOrderStock(order) {
 
 router.post("/", auth("buyer"), async (req, res) => {
   try {
-    const { items, paymentMethod } = req.body || {};
+    const { items, paymentMethod, cardDetails } = req.body || {};
     if (!Array.isArray(items) || !items.length) {
       return res.status(400).json({ message: "items[] is required" });
+    }
+
+    const resolvedMethod = normalizePaymentMethod(paymentMethod);
+    if (resolvedMethod === "Credit Card") {
+      const cardError = validateCardDetails(cardDetails);
+      if (cardError) return res.status(400).json({ message: cardError });
     }
 
     const products = await Product.find({ _id: { $in: items.map((i) => i.productId) }, isActive: true });
@@ -104,18 +124,28 @@ router.post("/", auth("buyer"), async (req, res) => {
       appliedStockUpdates.push({ productId: item.productId, quantity: item.quantity });
     }
 
-    const order = await Order.create({
+    const isCreditCard = resolvedMethod === "Credit Card";
+    const orderData = {
       buyerId: req.user.id,
       sellerId: firstSeller,
       products: orderItems,
       status: "Placed",
       totalPrice,
-      paymentMethod: normalizePaymentMethod(paymentMethod),
-      paymentStatus: "Pending",
+      paymentMethod: resolvedMethod,
+      paymentStatus: isCreditCard ? "Paid" : "Pending",
       expectedDeliveryDays,
       expectedDeliveryDate: addDays(new Date(), expectedDeliveryDays)
-    });
+    };
 
+    if (isCreditCard) {
+      const rawNumber = cardDetails.cardNumber.replace(/\s/g, "");
+      orderData.cardLast4 = rawNumber.slice(-4);
+      orderData.cardHolderName = cardDetails.cardHolder.trim();
+      orderData.cardExpiry = cardDetails.cardExpiry;
+      await User.findByIdAndUpdate(firstSeller, { $inc: { balance: totalPrice } });
+    }
+
+    const order = await Order.create(orderData);
     return res.status(201).json(order);
   } catch (err) {
     return res.status(500).json({ message: "Failed to place order", error: err.message });
@@ -250,6 +280,8 @@ router.get("/seller/me", auth("seller"), async (req, res) => {
         status: order.status,
         totalPrice: order.totalPrice,
         total_amount: order.totalPrice,
+        paymentMethod: order.paymentMethod,
+        paymentStatus: order.paymentStatus,
         createdAt: order.createdAt,
         created_at: order.createdAt,
         buyer_rating: r ? r.rating : null,
@@ -280,6 +312,16 @@ router.patch("/:id/status", auth("seller"), async (req, res) => {
 
     if (status === "Cancelled" && order.status !== "Cancelled") {
       await rollbackOrderStock(order);
+    }
+
+    // Credit seller balance when COD order is delivered
+    if (
+      status === "Delivered" &&
+      order.status !== "Delivered" &&
+      order.paymentMethod === "Cash on Delivery"
+    ) {
+      await User.findByIdAndUpdate(order.sellerId, { $inc: { balance: order.totalPrice } });
+      order.paymentStatus = "Paid";
     }
 
     order.status = status;

@@ -22,7 +22,7 @@ const orderSchema = new mongoose.Schema(
     totalPrice: { type: Number, required: true, min: 0 },
     paymentMethod: {
       type: String,
-      enum: ["Cash on Delivery", "Card Payment", "Wallet"],
+      enum: ["Cash on Delivery", "Credit Card"],
       default: "Cash on Delivery"
     },
     paymentStatus: {
@@ -30,6 +30,9 @@ const orderSchema = new mongoose.Schema(
       enum: ["Pending", "Paid", "Failed", "Refunded"],
       default: "Pending"
     },
+    cardLast4: { type: String, default: null },
+    cardHolderName: { type: String, default: null },
+    cardExpiry: { type: String, default: null },
     expectedDeliveryDays: {
       type: Number,
       min: 1,

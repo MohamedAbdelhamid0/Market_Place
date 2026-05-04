@@ -5,7 +5,7 @@ const Product = require("../models/Product");
 const Order = require("../models/Order");
 
 const router = express.Router();
-const PAYMENT_METHODS = ["Cash on Delivery", "Card Payment", "Wallet"];
+const PAYMENT_METHODS = ["Cash on Delivery", "Credit Card"];
 
 function addDays(baseDate, days) {
   const dt = new Date(baseDate);
@@ -16,6 +16,20 @@ function addDays(baseDate, days) {
 function normalizePaymentMethod(value) {
   const candidate = String(value || "").trim();
   return PAYMENT_METHODS.includes(candidate) ? candidate : "Cash on Delivery";
+}
+
+function validateCardDetails(cardDetails) {
+  if (!cardDetails) return "Card details are required for Credit Card payment";
+  const { cardNumber, cardHolder, cardExpiry, cardCVV } = cardDetails;
+  if (!cardNumber || !/^\d{16}$/.test(cardNumber.replace(/\s/g, "")))
+    return "Card number must be 16 digits";
+  if (!cardHolder || !cardHolder.trim())
+    return "Card holder name is required";
+  if (!cardExpiry || !/^(0[1-9]|1[0-2])\/\d{2}$/.test(cardExpiry))
+    return "Expiry must be in MM/YY format";
+  if (!cardCVV || !/^\d{3,4}$/.test(cardCVV))
+    return "CVV must be 3 or 4 digits";
+  return null;
 }
 
 function normalizeAddress(rawAddress = {}) {
@@ -70,7 +84,7 @@ async function buildBuyerCartPayload(userId) {
 
 router.get("/seller/me/profile", auth("seller"), async (req, res) => {
   try {
-    const user = await User.findById(req.user.id).select("name businessName email supportEmail phone addressLine city country");
+    const user = await User.findById(req.user.id).select("name businessName email supportEmail phone addressLine city country balance");
     if (!user) return res.status(404).json({ message: "Seller not found" });
     return res.json(user);
   } catch (err) {
@@ -353,6 +367,13 @@ router.delete("/buyer/me/wishlist/:productId", auth("buyer"), async (req, res) =
 router.post("/buyer/me/cart/checkout", auth("buyer"), async (req, res) => {
   try {
     const paymentMethod = normalizePaymentMethod(req.body?.paymentMethod);
+    const cardDetails = req.body?.cardDetails || null;
+
+    if (paymentMethod === "Credit Card") {
+      const cardError = validateCardDetails(cardDetails);
+      if (cardError) return res.status(400).json({ message: cardError });
+    }
+
     const user = await User.findById(req.user.id).select("cart");
     if (!user) return res.status(404).json({ message: "Buyer not found" });
     if (!Array.isArray(user.cart) || !user.cart.length) {
@@ -416,18 +437,28 @@ router.post("/buyer/me/cart/checkout", auth("buyer"), async (req, res) => {
         expectedDeliveryDays = Math.max(expectedDeliveryDays, Number(item.deliveryDays || 1));
       }
 
-      const order = await Order.create({
+      const isCreditCard = paymentMethod === "Credit Card";
+      const orderData = {
         buyerId: req.user.id,
         sellerId,
         products: orderItems,
         status: "Placed",
         totalPrice,
         paymentMethod,
-        paymentStatus: "Pending",
+        paymentStatus: isCreditCard ? "Paid" : "Pending",
         expectedDeliveryDays,
         expectedDeliveryDate: addDays(new Date(), expectedDeliveryDays)
-      });
+      };
 
+      if (isCreditCard) {
+        const rawNumber = cardDetails.cardNumber.replace(/\s/g, "");
+        orderData.cardLast4 = rawNumber.slice(-4);
+        orderData.cardHolderName = cardDetails.cardHolder.trim();
+        orderData.cardExpiry = cardDetails.cardExpiry;
+        await User.findByIdAndUpdate(sellerId, { $inc: { balance: totalPrice } });
+      }
+
+      const order = await Order.create(orderData);
       createdOrders.push(order);
     }
 
