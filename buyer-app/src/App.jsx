@@ -217,7 +217,6 @@ const ProductCard = memo(function ProductCard({ product, inWishlist, onAddToCart
         <button type="button" className="btn" style={{ background: inWishlist ? "#fecdd3" : "#e2e8f0", marginTop: 8 }} onClick={(e) => { e.stopPropagation(); onToggleWishlist(product); }}>
           {inWishlist ? "Remove Wishlist" : "Wishlist"}
         </button>
-        <button type="button" className="btn" style={{ background: "#dbeafe", marginTop: 8 }} onClick={(e) => { e.stopPropagation(); onOrderNow(product); }}>Order Now</button>
       </div>
     </article>
   );
@@ -806,7 +805,6 @@ function BuyerAppShell() {
 
                 <div className="detail-actions">
                   <button type="button" className="btn order-btn" onClick={() => onAddToCart(productDetail.product)}>Add to Cart</button>
-                  <button type="button" className="btn" style={{ background: "#dbeafe" }} onClick={() => onOrderNow(productDetail.product)}>Order Now</button>
                 </div>
 
                 <div className="detail-rating">
