@@ -4,17 +4,20 @@ import { api } from "../api";
 export default function DashboardPage() {
   const [products, setProducts] = useState([]);
   const [orders, setOrders] = useState([]);
+  const [balance, setBalance] = useState(0);
 
   useEffect(() => {
-    Promise.all([api.myProducts(), api.myOrders()])
-      .then(([p, o]) => {
+    Promise.all([api.myProducts(), api.myOrders(), api.myProfile()])
+      .then(([p, o, profile]) => {
         setProducts(p);
         setOrders(o);
+        setBalance(Number(profile.balance || 0));
       })
       .catch(console.error);
   }, []);
 
-  const revenue = orders.reduce((sum, o) => sum + Number(o.totalPrice || 0), 0);
+  // Revenue only counts orders that have been paid (Credit Card on place, COD on delivery)
+  const revenue = orders.reduce((sum, o) => sum + (o.paymentStatus === "Paid" ? Number(o.totalPrice || 0) : 0), 0);
   const reviewCount = products.reduce((sum, p) => sum + Number(p.reviewCount || 0), 0);
   const sellerRating = reviewCount
     ? products.reduce((sum, p) => sum + (Number(p.ratings || 0) * Number(p.reviewCount || 0)), 0) / reviewCount
@@ -38,7 +41,12 @@ export default function DashboardPage() {
         <div className="metric-card">
           <div className="metric-label">Total Revenue</div>
           <div className="metric-value">${revenue.toFixed(2)}</div>
-          <div className="metric-subtitle">All time sales</div>
+          <div className="metric-subtitle">Paid orders only</div>
+        </div>
+        <div className="metric-card">
+          <div className="metric-label">Account Balance</div>
+          <div className="metric-value">${balance.toFixed(2)}</div>
+          <div className="metric-subtitle">Available earnings</div>
         </div>
         <div className="metric-card">
           <div className="metric-label">Seller Rating</div>
@@ -53,7 +61,7 @@ export default function DashboardPage() {
         <div className="metric-card">
           <div className="metric-label">Products Sold</div>
           <div className="metric-value">{productsSold}</div>
-          <div className="metric-subtitle">This week</div>
+          <div className="metric-subtitle">All time</div>
         </div>
       </div>
 
@@ -66,6 +74,9 @@ export default function DashboardPage() {
                 <h3>Order #{String(order._id).slice(-6)}</h3>
                 <div className="order-meta">
                   Customer: {order.buyerName || "Unknown"}
+                </div>
+                <div className="order-meta" style={{ fontSize: 12, color: order.paymentStatus === "Paid" ? "green" : "#f59e0b" }}>
+                  Payment: {order.paymentStatus || "Pending"} ({order.paymentMethod || "Cash on Delivery"})
                 </div>
               </div>
               <span className={`status-badge status-${String(order.status || "pending").toLowerCase()}`}>

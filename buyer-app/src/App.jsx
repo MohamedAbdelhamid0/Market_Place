@@ -238,13 +238,17 @@ function BuyerAppShell() {
   const [minRating, setMinRating] = useState("0");
   const [orderFilter, setOrderFilter] = useState("All");
   const [paymentMethod, setPaymentMethod] = useState("Cash on Delivery");
+  const [cardDetails, setCardDetails] = useState({ cardNumber: "", cardHolder: "", cardExpiry: "", cardCVV: "" });
   const [reportForm, setReportForm] = useState({ orderId: "", sellerId: "", reasonType: "Late Delivery", reason: "" });
+  const [myFlags, setMyFlags] = useState([]);
+  const [reportTab, setReportTab] = useState("submit");
   const [ratingForms, setRatingForms] = useState({});
   const [toasts, setToasts] = useState([]);
   const [visibleCount, setVisibleCount] = useState(12);
   const [trackingOrderId, setTrackingOrderId] = useState("");
   const [productDetail, setProductDetail] = useState(null);
   const [productReview, setProductReview] = useState({ rating: 5, text: "" });
+  const [aiSummary, setAiSummary] = useState({ text: "", loading: false, error: "" });
 
   const pushToast = useCallback((message, type = "info") => {
     const id = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
@@ -256,18 +260,20 @@ function BuyerAppShell() {
 
   async function refreshAll() {
     try {
-      const [productsData, ordersData, cartData, wishlistData, profileData] = await Promise.all([
+      const [productsData, ordersData, cartData, wishlistData, profileData, flagsData] = await Promise.all([
         api.products(),
         api.buyerOrders(),
         api.cart(),
         api.wishlist(),
-        api.buyerProfile()
+        api.buyerProfile(),
+        api.myFlags().catch(() => [])
       ]);
 
       setProducts(Array.isArray(productsData) ? productsData : []);
       setOrders(Array.isArray(ordersData) ? ordersData : []);
       setCart(cartData || { items: [], subtotal: 0, itemCount: 0 });
       setWishlist(Array.isArray(wishlistData) ? wishlistData : []);
+      setMyFlags(Array.isArray(flagsData) ? flagsData : []);
       setProfile((prev) => ({
         ...prev,
         name: profileData?.name || prev.name,
@@ -487,6 +493,17 @@ function BuyerAppShell() {
   function closeProductDetail() {
     setProductDetail(null);
     setProductReview({ rating: 5, text: "" });
+    setAiSummary({ text: "", loading: false, error: "" });
+  }
+
+  async function fetchAiSummary(productId) {
+    setAiSummary({ text: "", loading: true, error: "" });
+    try {
+      const result = await api.summary(productId);
+      setAiSummary({ text: result.summary, loading: false, error: "", aiGenerated: result.aiGenerated, sampleSize: result.sampleSize, averageRating: result.averageRating });
+    } catch (err) {
+      setAiSummary({ text: "", loading: false, error: err.message || "Failed to generate summary" });
+    }
   }
 
   async function updateCartQuantity(productId, quantity) {
@@ -564,7 +581,16 @@ function BuyerAppShell() {
         pushToast("Your cart is empty", "info");
         return;
       }
-      await api.checkoutCart({ paymentMethod });
+      if (paymentMethod === "Credit Card") {
+        const { cardNumber, cardHolder, cardExpiry, cardCVV } = cardDetails;
+        if (!cardNumber || !cardHolder || !cardExpiry || !cardCVV) {
+          pushToast("Please fill in all credit card details", "error");
+          return;
+        }
+      }
+      const payload = { paymentMethod };
+      if (paymentMethod === "Credit Card") payload.cardDetails = cardDetails;
+      await api.checkoutCart(payload);
       await refreshAll();
       setScreen("orders");
       pushToast("Checkout successful", "success");
@@ -662,12 +688,6 @@ function BuyerAppShell() {
         return;
       }
 
-      const selectedOrder = orders.find((order) => String(order._id) === String(reportForm.orderId));
-      if (reportForm.reasonType === "Late Delivery" && !canFlagLateDelivery(selectedOrder)) {
-        pushToast(`Late-delivery flags are allowed only after expected date + ${LATE_DELIVERY_GRACE_DAYS} days`, "info");
-        return;
-      }
-
       await api.flagUser({
         reportedUserId: reportForm.sellerId,
         reason: reportForm.reasonType,
@@ -676,7 +696,10 @@ function BuyerAppShell() {
       });
 
       setReportForm({ orderId: "", sellerId: "", reasonType: "Late Delivery", reason: "" });
-      pushToast("Report submitted", "success");
+      const flagsData = await api.myFlags().catch(() => []);
+      setMyFlags(Array.isArray(flagsData) ? flagsData : []);
+      pushToast("Report submitted successfully", "success");
+      setReportTab("history");
     } catch (err) {
       pushToast(err.message || "Failed to submit report", "error");
     }
@@ -828,7 +851,61 @@ function BuyerAppShell() {
                 </div>
 
                 <div className="detail-comments">
-                  <h3>Recent reviews</h3>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
+                    <h3 style={{ margin: 0 }}>Recent reviews</h3>
+                    {Array.isArray(productDetail.comments) && productDetail.comments.length > 0 && (
+                      <button
+                        type="button"
+                        onClick={() => fetchAiSummary(productDetail.product._id)}
+                        disabled={aiSummary.loading}
+                        style={{
+                          display: "flex",
+                          alignItems: "center",
+                          gap: 6,
+                          padding: "6px 14px",
+                          borderRadius: 8,
+                          border: "none",
+                          background: aiSummary.loading ? "#e2e8f0" : "linear-gradient(135deg, #6366f1, #8b5cf6)",
+                          color: aiSummary.loading ? "#9ca3af" : "white",
+                          fontWeight: 600,
+                          fontSize: 13,
+                          cursor: aiSummary.loading ? "not-allowed" : "pointer"
+                        }}
+                      >
+                        {aiSummary.loading ? "⏳ Summarizing..." : "✨ AI Summary"}
+                      </button>
+                    )}
+                  </div>
+
+                  {/* AI Summary Result */}
+                  {aiSummary.error && (
+                    <div style={{ padding: "10px 14px", background: "#fee2e2", borderRadius: 8, color: "#b91c1c", fontSize: 13, marginBottom: 12 }}>
+                      {aiSummary.error}
+                    </div>
+                  )}
+                  {aiSummary.text && !aiSummary.loading && (
+                    <div style={{
+                      marginBottom: 16,
+                      padding: "14px 16px",
+                      background: "linear-gradient(135deg, #ede9fe, #dbeafe)",
+                      borderRadius: 10,
+                      border: "1px solid #c4b5fd"
+                    }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 8 }}>
+                        <span style={{ fontSize: 16 }}>✨</span>
+                        <strong style={{ fontSize: 13, color: "#5b21b6" }}>
+                          AI Summary — {aiSummary.sampleSize} review{aiSummary.sampleSize !== 1 ? "s" : ""} · avg {aiSummary.averageRating}/5 ⭐
+                        </strong>
+                        {aiSummary.aiGenerated && (
+                          <span style={{ marginLeft: "auto", fontSize: 10, background: "#8b5cf6", color: "white", padding: "2px 6px", borderRadius: 8, fontWeight: 600 }}>
+                            Powered by Groq AI (Llama 3.1)
+                          </span>
+                        )}
+                      </div>
+                      <p style={{ margin: 0, fontSize: 13, color: "#374151", lineHeight: 1.6 }}>{aiSummary.text}</p>
+                    </div>
+                  )}
+
                   {Array.isArray(productDetail.comments) && productDetail.comments.length ? productDetail.comments.slice(0, 4).map((comment) => (
                     <article key={comment._id} className="detail-comment">
                       <div className="detail-comment__meta">
@@ -866,12 +943,60 @@ function BuyerAppShell() {
 
             <div className="product-details" style={{ marginTop: 16 }}>
               <h2 style={{ marginBottom: 10 }}>Payment and Checkout</h2>
-              <select className="search-bar" value={paymentMethod} onChange={(e) => setPaymentMethod(e.target.value)}>
+              <select className="search-bar" value={paymentMethod} onChange={(e) => { setPaymentMethod(e.target.value); setCardDetails({ cardNumber: "", cardHolder: "", cardExpiry: "", cardCVV: "" }); }}>
                 <option>Cash on Delivery</option>
-                <option>Card Payment</option>
-                <option>Wallet</option>
+                <option>Credit Card</option>
               </select>
-              <p style={{ marginBottom: 12 }}>Subtotal: <strong>{money(cart.subtotal)}</strong></p>
+
+              {paymentMethod === "Credit Card" && (
+                <div style={{ marginTop: 12, padding: 14, background: "#f0f9ff", borderRadius: 8, border: "1px solid #bae6fd" }}>
+                  <p style={{ fontWeight: 600, marginBottom: 10 }}>💳 Credit Card Details</p>
+                  <input
+                    className="search-bar"
+                    placeholder="Card Number (16 digits)"
+                    maxLength={19}
+                    value={cardDetails.cardNumber}
+                    onChange={(e) => {
+                      const raw = e.target.value.replace(/\D/g, "").slice(0, 16);
+                      const formatted = raw.replace(/(.{4})/g, "$1 ").trim();
+                      setCardDetails((prev) => ({ ...prev, cardNumber: formatted }));
+                    }}
+                    style={{ marginBottom: 8 }}
+                  />
+                  <input
+                    className="search-bar"
+                    placeholder="Card Holder Name"
+                    value={cardDetails.cardHolder}
+                    onChange={(e) => setCardDetails((prev) => ({ ...prev, cardHolder: e.target.value }))}
+                    style={{ marginBottom: 8 }}
+                  />
+                  <div style={{ display: "flex", gap: 8 }}>
+                    <input
+                      className="search-bar"
+                      placeholder="MM/YY"
+                      maxLength={5}
+                      value={cardDetails.cardExpiry}
+                      onChange={(e) => {
+                        let val = e.target.value.replace(/\D/g, "").slice(0, 4);
+                        if (val.length >= 3) val = val.slice(0, 2) + "/" + val.slice(2);
+                        setCardDetails((prev) => ({ ...prev, cardExpiry: val }));
+                      }}
+                      style={{ flex: 1 }}
+                    />
+                    <input
+                      className="search-bar"
+                      placeholder="CVV"
+                      maxLength={4}
+                      type="password"
+                      value={cardDetails.cardCVV}
+                      onChange={(e) => setCardDetails((prev) => ({ ...prev, cardCVV: e.target.value.replace(/\D/g, "").slice(0, 4) }))}
+                      style={{ flex: 1 }}
+                    />
+                  </div>
+                </div>
+              )}
+
+              <p style={{ marginBottom: 12, marginTop: 12 }}>Subtotal: <strong>{money(cart.subtotal)}</strong></p>
               <button type="button" className="btn order-btn" onClick={checkoutCart}>Process Order</button>
               <button type="button" className="btn" style={{ background: "#e2e8f0", marginTop: 10 }} onClick={clearCart}>Clear Cart</button>
             </div>
@@ -1094,46 +1219,155 @@ function BuyerAppShell() {
       <div className={`screen ${screen === "report" ? "active" : ""}`} id="report">
         {screen === "report" ? (
           <div>
-            <h1 className="header">Report</h1>
-            <div className="report-box">
-              <div className="form-group">
-                <label htmlFor="report-order">Order</label>
-                <select id="report-order" className="search-bar" value={reportForm.orderId} onChange={(e) => {
-                  setReportForm((prev) => ({ ...prev, orderId: e.target.value, sellerId: "" }));
-                }}>
-                  <option value="">Select order</option>
-                  {orders.map((order) => (
-                    <option key={order._id} value={order._id}>#{String(order._id).slice(-6)} - {order.productName || "Order"}</option>
-                  ))}
-                </select>
-              </div>
+            <h1 className="header">Reports</h1>
 
-              <div className="form-group">
-                <label htmlFor="report-seller">Seller</label>
-                <select id="report-seller" className="search-bar" value={reportForm.sellerId} onChange={(e) => setReportForm((prev) => ({ ...prev, sellerId: e.target.value }))}>
-                  <option value="">Select seller</option>
-                  {reportSellerOptions.map((seller) => (
-                    <option key={seller.sellerId} value={seller.sellerId}>{seller.sellerName}</option>
-                  ))}
-                </select>
-              </div>
-
-              <div className="form-group">
-                <label htmlFor="report-type">Report Type</label>
-                <select id="report-type" className="search-bar" value={reportForm.reasonType} onChange={(e) => setReportForm((prev) => ({ ...prev, reasonType: e.target.value }))}>
-                  <option value="Late Delivery">Late Delivery</option>
-                  <option value="Buyer Report">Other Seller Issue</option>
-                </select>
-              </div>
-
-              <div className="form-group">
-                <label htmlFor="report-reason">Reason</label>
-                <textarea id="report-reason" rows={4} value={reportForm.reason} onChange={(e) => setReportForm((prev) => ({ ...prev, reason: e.target.value }))} placeholder="Describe the issue with this seller" />
-              </div>
-
-              <button type="button" className="btn order-btn" onClick={submitReport}>Submit Report</button>
-              <p className="report-notice">If an order has multiple sellers, choose the exact seller above before submitting.</p>
+            {/* Tabs */}
+            <div style={{ display: "flex", gap: 8, marginBottom: 20 }}>
+              {["submit", "history"].map((tab) => (
+                <button
+                  key={tab}
+                  type="button"
+                  onClick={async () => {
+                    setReportTab(tab);
+                    if (tab === "history") {
+                      try {
+                        const flagsData = await api.myFlags();
+                        setMyFlags(Array.isArray(flagsData) ? flagsData : []);
+                      } catch (err) {
+                        pushToast(err.message || "Failed to load reports", "error");
+                      }
+                    }
+                  }}
+                  style={{
+                    padding: "8px 20px",
+                    borderRadius: 8,
+                    border: "none",
+                    fontWeight: 600,
+                    cursor: "pointer",
+                    background: reportTab === tab ? "#1e3a5f" : "#e2e8f0",
+                    color: reportTab === tab ? "white" : "#374151"
+                  }}
+                >
+                  {tab === "submit" ? "🚩 Submit Report" : `📋 My Reports (${myFlags.length})`}
+                </button>
+              ))}
             </div>
+
+            {reportTab === "history" && (
+              <button
+                type="button"
+                onClick={async () => {
+                  try {
+                    const flagsData = await api.myFlags();
+                    setMyFlags(Array.isArray(flagsData) ? flagsData : []);
+                  } catch (err) {
+                    pushToast(err.message || "Failed to load reports", "error");
+                  }
+                }}
+                style={{ marginBottom: 12, padding: "6px 14px", borderRadius: 6, border: "1px solid #e2e8f0", background: "white", cursor: "pointer", fontSize: 13 }}
+              >
+                🔄 Refresh
+              </button>
+            )}
+
+            {reportTab === "submit" ? (
+              <div className="report-box">
+                <div className="form-group">
+                  <label htmlFor="report-order">Order</label>
+                  <select id="report-order" className="search-bar" value={reportForm.orderId} onChange={(e) => {
+                    setReportForm((prev) => ({ ...prev, orderId: e.target.value, sellerId: "" }));
+                  }}>
+                    <option value="">Select order</option>
+                    {orders
+                      .filter((o) => o.status !== "Cancelled")
+                      .map((order) => (
+                        <option key={order._id} value={order._id}>
+                          #{String(order._id).slice(-6)} - {order.productName || "Order"} [{order.status}]
+                        </option>
+                      ))}
+                  </select>
+                </div>
+
+                <div className="form-group">
+                  <label htmlFor="report-seller">Seller</label>
+                  <select id="report-seller" className="search-bar" value={reportForm.sellerId} onChange={(e) => setReportForm((prev) => ({ ...prev, sellerId: e.target.value }))}>
+                    <option value="">Select seller</option>
+                    {reportSellerOptions.map((seller) => (
+                      <option key={seller.sellerId} value={seller.sellerId}>{seller.sellerName}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="form-group">
+                  <label htmlFor="report-type">Report Type</label>
+                  <select id="report-type" className="search-bar" value={reportForm.reasonType} onChange={(e) => setReportForm((prev) => ({ ...prev, reasonType: e.target.value }))}>
+                    <option value="Late Delivery">Late Delivery</option>
+                    <option value="Buyer Report">Other Seller Issue</option>
+                  </select>
+                </div>
+
+                <div className="form-group">
+                  <label htmlFor="report-reason">Details</label>
+                  <textarea id="report-reason" rows={4} value={reportForm.reason} onChange={(e) => setReportForm((prev) => ({ ...prev, reason: e.target.value }))} placeholder="Describe the issue in detail..." />
+                </div>
+
+                <button type="button" className="btn order-btn" onClick={submitReport}>Submit Report</button>
+                <p className="report-notice">If an order has multiple sellers, choose the exact seller above before submitting.</p>
+              </div>
+            ) : (
+              <div>
+                {myFlags.length ? myFlags.map((flag) => {
+                  const isFiled = String(flag.reportedBy?._id || flag.reportedBy) === String(user?.id);
+                  const statusColors = {
+                    Open: { background: "#fee2e2", color: "#b91c1c" },
+                    UnderReview: { background: "#fef9c3", color: "#92400e" },
+                    Resolved: { background: "#dcfce7", color: "#15803d" },
+                    Dismissed: { background: "#f1f5f9", color: "#64748b" }
+                  };
+                  const style = statusColors[flag.status] || statusColors.Open;
+                  return (
+                    <div key={flag._id} className="order-card" style={{ borderLeft: `4px solid ${style.color}`, marginBottom: 12 }}>
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: 8 }}>
+                        <div>
+                          <strong>{flag.reason}</strong>
+                          <div style={{ fontSize: 12, marginTop: 4 }}>
+                            <span style={{
+                              padding: "2px 8px",
+                              borderRadius: 10,
+                              background: isFiled ? "#dbeafe" : "#fce7f3",
+                              color: isFiled ? "#1d4ed8" : "#be185d",
+                              fontWeight: 600
+                            }}>
+                              {isFiled ? "📤 Filed by you" : "📥 Against you"}
+                            </span>
+                          </div>
+                        </div>
+                        <span style={{ padding: "4px 12px", borderRadius: 12, fontSize: 12, fontWeight: 700, ...style }}>
+                          {flag.status}
+                        </span>
+                      </div>
+                      <div style={{ marginTop: 8, fontSize: 13, color: "#6b7280", display: "flex", flexDirection: "column", gap: 3 }}>
+                        {isFiled
+                          ? <span>Against seller: <strong>{flag.reportedUserId?.name || "Unknown"}</strong></span>
+                          : <span>Filed by: <strong>{flag.reportedBy?.name || "Unknown"}</strong></span>
+                        }
+                        {flag.orderId && <span>Order: <strong>#{String(flag.orderId).slice(-6)}</strong></span>}
+                        {flag.details && <span>Details: {flag.details}</span>}
+                        {flag.resolutionNote && (
+                          <span style={{ color: "#15803d" }}>Resolution: {flag.resolutionNote}</span>
+                        )}
+                        <span>Submitted: {new Date(flag.createdAt).toLocaleDateString()}</span>
+                      </div>
+                    </div>
+                  );
+                }) : (
+                  <div style={{ textAlign: "center", padding: 40, color: "#9ca3af" }}>
+                    <div style={{ fontSize: 32 }}>📭</div>
+                    <p>No reports submitted yet</p>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         ) : null}
       </div>
