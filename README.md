@@ -46,9 +46,12 @@ Create `backend/.env` with:
 ```
 PORT=4000
 MONGODB_URI=mongodb://127.0.0.1:27017/market_place
-JWT_SECRET=your_secret_key_here_change_in_production
+JWT_SECRET=change_this_secret
 JWT_EXPIRES_IN=7d
+GROQ_API_KEY=
 ```
+
+GROQ_API_KEY can be left blank unless you need it.
 
 ### 4. Run Everything
 
