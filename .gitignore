@@ -4,6 +4,10 @@ node_modules/
 backend/node_modules/
 buyer-app/node_modules/
 seller-app/node_modules/
+.env
+*.env
+.env.*
+!.env.example
 
 # Runtime uploads and generated assets
 uploads/
