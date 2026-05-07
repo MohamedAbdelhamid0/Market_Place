@@ -9,6 +9,7 @@ const { auth } = require("../middleware/auth");
 
 const router = express.Router();
 const PAYMENT_METHODS = ["Cash on Delivery", "Credit Card"];
+const CREDIT_CARD_EARNING_STATUSES = ["Processing", "Preparing", "Shipping", "Delivered"];
 
 function addDays(baseDate, days) {
   const dt = new Date(baseDate);
@@ -81,6 +82,20 @@ function resolveDeliveryAddress(order = {}, buyer = {}) {
   return null;
 }
 
+function shouldCreditSellerEarnings(order, nextStatus) {
+  if (order.sellerEarningsCredited) return false;
+
+  if (order.paymentMethod === "Cash on Delivery") {
+    return nextStatus === "Delivered";
+  }
+
+  if (order.paymentMethod === "Credit Card") {
+    return CREDIT_CARD_EARNING_STATUSES.includes(nextStatus);
+  }
+
+  return false;
+}
+
 async function rollbackOrderStock(order) {
   const updates = (order.products || []).map((item) => ({
     updateOne: {
@@ -122,31 +137,7 @@ async function refreshSellerRatingSummary(sellerId) {
   return summary;
 }
 
-async function recomputeSellerDeliveredProductSales(sellerId) {
-  const [sellerProducts, deliveredOrders] = await Promise.all([
-    Product.find({ sellerId }).select("_id").lean(),
-    Order.find({ sellerId, status: "Delivered" }).select("products").lean()
-  ]);
 
-  const soldByProduct = new Map();
-  for (const order of deliveredOrders) {
-    for (const item of order.products || []) {
-      const key = String(item.productId);
-      soldByProduct.set(key, (soldByProduct.get(key) || 0) + Number(item.quantity || 0));
-    }
-  }
-
-  const updates = sellerProducts.map((product) => ({
-    updateOne: {
-      filter: { _id: product._id, sellerId },
-      update: { $set: { orders: soldByProduct.get(String(product._id)) || 0 } }
-    }
-  }));
-
-  if (updates.length) {
-    await Product.bulkWrite(updates);
-  }
-}
 
 router.post("/", auth("buyer"), async (req, res) => {
   try {
@@ -253,6 +244,7 @@ router.post("/", auth("buyer"), async (req, res) => {
       totalPrice,
       paymentMethod: resolvedMethod,
       paymentStatus: isCreditCard ? "Paid" : "Pending",
+      sellerEarningsCredited: false,
       expectedDeliveryDays,
       expectedDeliveryDate: addDays(new Date(), expectedDeliveryDays),
       deliveryAddress
@@ -263,7 +255,6 @@ router.post("/", auth("buyer"), async (req, res) => {
       orderData.cardLast4 = rawNumber.slice(-4);
       orderData.cardHolderName = cardDetails.cardHolder.trim();
       orderData.cardExpiry = cardDetails.cardExpiry;
-      await User.findByIdAndUpdate(firstSeller, { $inc: { balance: totalPrice } });
     }
 
     const order = await Order.create(orderData);
@@ -400,25 +391,7 @@ router.get("/seller/rating", auth("seller"), async (req, res) => {
   }
 });
 
-router.get("/seller/stats", auth("seller"), async (req, res) => {
-  try {
-    const deliveredOrders = await Order.find({ sellerId: req.user.id, status: "Delivered" })
-      .select("products")
-      .lean();
 
-    const productsSold = deliveredOrders.reduce(
-      (sum, order) => sum + (order.products || []).reduce(
-        (itemSum, item) => itemSum + Number(item.quantity || 0),
-        0
-      ),
-      0
-    );
-
-    return res.json({ productsSold });
-  } catch (err) {
-    return res.status(500).json({ message: "Failed to fetch seller stats", error: err.message });
-  }
-});
 
 router.get("/seller/me", auth("seller"), async (req, res) => {
   try {
@@ -462,6 +435,7 @@ router.get("/seller/me", auth("seller"), async (req, res) => {
         total_amount: order.totalPrice,
         paymentMethod: order.paymentMethod,
         paymentStatus: order.paymentStatus,
+        sellerEarningsCredited: order.sellerEarningsCredited,
         deliveryAddress: resolveDeliveryAddress(order, buyer),
         createdAt: order.createdAt,
         created_at: order.createdAt,
@@ -497,14 +471,12 @@ router.patch("/:id/status", auth("seller"), async (req, res) => {
       await rollbackOrderStock(order);
     }
 
-    const shouldCreditCodBalance =
-      status === "Delivered" &&
-      previousStatus !== "Delivered" &&
-      order.paymentMethod === "Cash on Delivery";
+    const shouldCreditBalance = shouldCreditSellerEarnings(order, status);
 
     order.status = status;
-    if (shouldCreditCodBalance) {
+    if (shouldCreditBalance) {
       order.paymentStatus = "Paid";
+      order.sellerEarningsCredited = true;
     }
 
     // Older orders may be missing fields that are now required on order items.
@@ -512,13 +484,11 @@ router.patch("/:id/status", auth("seller"), async (req, res) => {
     // move those legacy orders to Delivered.
     await order.save({ validateModifiedOnly: true });
 
-    if (shouldCreditCodBalance) {
+    if (shouldCreditBalance) {
       await User.findByIdAndUpdate(order.sellerId, { $inc: { balance: Number(order.totalPrice || 0) } });
     }
 
-    if (status === "Delivered" || previousStatus === "Delivered") {
-      await recomputeSellerDeliveredProductSales(order.sellerId);
-    }
+
 
     return res.json(order);
   } catch (err) {

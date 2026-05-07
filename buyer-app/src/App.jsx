@@ -114,6 +114,32 @@ function AuthScreen({ onAuthed }) {
 
   return (
     <main className="auth-wrapper">
+      <aside className="auth-cover" aria-label="Marketplace shopping preview">
+        <div className="auth-cover__photo">
+          <div className="auth-cover__sun" />
+          <div className="auth-cover__sparkle auth-cover__sparkle--one">✦</div>
+          <div className="auth-cover__sparkle auth-cover__sparkle--two">✧</div>
+          <div className="auth-cover__bag auth-cover__bag--primary">🛍️</div>
+          <div className="auth-cover__bag auth-cover__bag--secondary">📦</div>
+          <div className="auth-cover__product auth-cover__product--one" />
+          <div className="auth-cover__product auth-cover__product--two" />
+          <div className="auth-cover__floating-card">
+            <strong>2-day delivery</strong>
+            <span>Live order updates</span>
+          </div>
+        </div>
+        <div className="auth-cover__content">
+          <span className="auth-cover__eyebrow">Buyer marketplace</span>
+          <h2>Discover trusted products from local sellers.</h2>
+          <p>Save addresses, track orders, and checkout securely from one clean shopping space.</p>
+          <div className="auth-cover__features" aria-label="Buyer marketplace benefits">
+            <span>🔒 Secure checkout</span>
+            <span>📍 Saved addresses</span>
+            <span>⭐ Trusted ratings</span>
+          </div>
+        </div>
+      </aside>
+
       <section className="auth-card">
         <div className="auth-logo">
           <div className="logo-icon">{mode === "login" ? "🔐" : "✨"}</div>
@@ -166,6 +192,12 @@ function AuthScreen({ onAuthed }) {
           </button>
         </form>
 
+        <div className="auth-benefits" aria-label="Account benefits">
+          <span>Fast checkout</span>
+          <span>Easy returns</span>
+          <span>Order history</span>
+        </div>
+
         <p className="auth-footer">
           {mode === "login" ? "No account?" : "Already registered?"}{" "}
           <button type="button" className="link-btn" onClick={() => setMode(mode === "login" ? "register" : "login")}>
@@ -173,6 +205,26 @@ function AuthScreen({ onAuthed }) {
           </button>
         </p>
       </section>
+
+      <aside className="auth-cover auth-cover--secondary" aria-label="Buyer deals and support preview">
+        <div className="auth-cover__deal-panel">
+          <div className="auth-cover__deal-card auth-cover__deal-card--large">
+            <span>🔥</span>
+            <strong>Fresh deals</strong>
+            <small>Discounted picks updated daily</small>
+          </div>
+          <div className="auth-cover__deal-row">
+            <div className="auth-cover__deal-card">🎧</div>
+            <div className="auth-cover__deal-card">👟</div>
+            <div className="auth-cover__deal-card">⌚</div>
+          </div>
+        </div>
+        <div className="auth-cover__content auth-cover__content--compact">
+          <span className="auth-cover__eyebrow">Smart shopping</span>
+          <h2>Deals, wishlists, and support in one place.</h2>
+          <p>Keep favorite products close and resolve reports from your buyer dashboard.</p>
+        </div>
+      </aside>
     </main>
   );
 }
