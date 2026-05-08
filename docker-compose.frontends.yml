@@ -1,0 +1,21 @@
+version: '3.8'
+services:
+  buyer:
+    build:
+      context: ./buyer-app
+      args:
+        - VITE_API_URL=http://13.53.218.10/api
+    image: marketplace-buyer:latest
+    ports:
+      - "8080:80"
+    restart: unless-stopped
+
+  seller:
+    build:
+      context: ./seller-app
+      args:
+        - VITE_API_URL=http://13.53.218.10/api
+    image: marketplace-seller:latest
+    ports:
+      - "8081:80"
+    restart: unless-stopped
