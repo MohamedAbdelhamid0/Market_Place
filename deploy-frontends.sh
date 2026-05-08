@@ -21,6 +21,8 @@ build_image() {
   local app_dir="$1"
   local image_name="$2"
   docker build \
+    --no-cache \
+    --pull \
     --build-arg VITE_API_URL="$BACKEND_URL" \
     -t "$image_name" \
     "$app_dir"
