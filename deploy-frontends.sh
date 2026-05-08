@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-BACKEND_URL="${BACKEND_URL:-http://13.53.186.81/api}"
+BACKEND_URL="${BACKEND_URL:-/api}"
 BUYER_IMAGE="marketplace-buyer:latest"
 SELLER_IMAGE="marketplace-seller:latest"
 BUYER_CONTAINER="marketplace-buyer"
