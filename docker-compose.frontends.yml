@@ -4,7 +4,7 @@ services:
     build:
       context: ./buyer-app
       args:
-        - VITE_API_URL=http://13.53.218.10/api
+        - VITE_API_URL=http://13.53.186.81/api
     image: marketplace-buyer:latest
     ports:
       - "8080:80"
@@ -14,7 +14,7 @@ services:
     build:
       context: ./seller-app
       args:
-        - VITE_API_URL=http://13.53.218.10/api
+        - VITE_API_URL=http://13.53.186.81/api
     image: marketplace-seller:latest
     ports:
       - "8081:80"
