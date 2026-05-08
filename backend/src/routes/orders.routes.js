@@ -139,6 +139,79 @@ async function refreshSellerRatingSummary(sellerId) {
 
 
 
+/**
+ * @swagger
+ * tags:
+ *   name: Orders
+ *   description: Order placement and management for buyers and sellers
+ */
+
+/**
+ * @swagger
+ * /api/orders:
+ *   post:
+ *     summary: Place a new order (buyer only)
+ *     tags: [Orders]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [items, paymentMethod]
+ *             properties:
+ *               items:
+ *                 type: array
+ *                 items:
+ *                   type: object
+ *                   properties:
+ *                     productId:
+ *                       type: string
+ *                       example: "64a1f2b3c4d5e6f7a8b9c0d4"
+ *                     quantity:
+ *                       type: integer
+ *                       example: 2
+ *               paymentMethod:
+ *                 type: string
+ *                 enum: ["Cash on Delivery", "Credit Card"]
+ *                 example: "Cash on Delivery"
+ *               deliveryAddressId:
+ *                 type: string
+ *                 description: ID of a saved address (uses default if omitted)
+ *               cardDetails:
+ *                 type: object
+ *                 description: Required only when paymentMethod is "Credit Card"
+ *                 properties:
+ *                   cardNumber:
+ *                     type: string
+ *                     example: "4111111111111111"
+ *                   cardHolder:
+ *                     type: string
+ *                     example: "John Doe"
+ *                   cardExpiry:
+ *                     type: string
+ *                     example: "12/26"
+ *                   cardCVV:
+ *                     type: string
+ *                     example: "123"
+ *     responses:
+ *       201:
+ *         description: Order placed successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Order'
+ *       400:
+ *         description: Validation error (missing items, out of stock, mixed sellers, invalid card)
+ *       401:
+ *         description: Unauthorized
+ *       403:
+ *         description: Forbidden
+ *       500:
+ *         description: Internal server error
+ */
 router.post("/", auth("buyer"), async (req, res) => {
   try {
     const { items, paymentMethod, cardDetails, deliveryAddressId, deliveryAddress: requestDeliveryAddress } = req.body || {};
@@ -264,6 +337,30 @@ router.post("/", auth("buyer"), async (req, res) => {
   }
 });
 
+/**
+ * @swagger
+ * /api/orders/buyer/me:
+ *   get:
+ *     summary: Get the authenticated buyer's order history (buyer only)
+ *     tags: [Orders]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: List of orders with detailed product and seller info
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: array
+ *               items:
+ *                 $ref: '#/components/schemas/Order'
+ *       401:
+ *         description: Unauthorized
+ *       403:
+ *         description: Forbidden
+ *       500:
+ *         description: Internal server error
+ */
 router.get("/buyer/me", auth("buyer"), async (req, res) => {
   try {
     const orders = await Order.find({ buyerId: req.user.id }).sort({ createdAt: -1 }).lean();
@@ -320,6 +417,33 @@ router.get("/buyer/me", auth("buyer"), async (req, res) => {
   }
 });
 
+/**
+ * @swagger
+ * /api/orders/buyer/{id}:
+ *   delete:
+ *     summary: Remove a cancelled order from buyer history (buyer only)
+ *     tags: [Orders]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Order MongoDB ObjectId
+ *     responses:
+ *       200:
+ *         description: Cancelled order removed from history
+ *       400:
+ *         description: Order is not cancelled — cannot remove
+ *       401:
+ *         description: Unauthorized
+ *       404:
+ *         description: Order not found
+ *       500:
+ *         description: Internal server error
+ */
 router.delete("/buyer/:id", auth("buyer"), async (req, res) => {
   try {
     const order = await Order.findOne({ _id: req.params.id, buyerId: req.user.id });
@@ -336,6 +460,37 @@ router.delete("/buyer/:id", auth("buyer"), async (req, res) => {
   }
 });
 
+/**
+ * @swagger
+ * /api/orders/buyer/{id}/cancel:
+ *   patch:
+ *     summary: Cancel an order and rollback stock (buyer only)
+ *     tags: [Orders]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Order MongoDB ObjectId
+ *     responses:
+ *       200:
+ *         description: Order cancelled and stock restored
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Order'
+ *       400:
+ *         description: Order can no longer be cancelled (already Shipped or Delivered)
+ *       401:
+ *         description: Unauthorized
+ *       404:
+ *         description: Order not found
+ *       500:
+ *         description: Internal server error
+ */
 router.patch("/buyer/:id/cancel", auth("buyer"), async (req, res) => {
   try {
     const order = await Order.findOne({ _id: req.params.id, buyerId: req.user.id });
@@ -360,6 +515,35 @@ router.patch("/buyer/:id/cancel", auth("buyer"), async (req, res) => {
   }
 });
 
+/**
+ * @swagger
+ * /api/orders/seller/rating:
+ *   get:
+ *     summary: Get the authenticated seller's average rating and review count (seller only)
+ *     tags: [Orders]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Seller rating summary
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 rating:
+ *                   type: number
+ *                   example: 4.5
+ *                 reviewCount:
+ *                   type: integer
+ *                   example: 20
+ *       401:
+ *         description: Unauthorized
+ *       403:
+ *         description: Forbidden
+ *       500:
+ *         description: Internal server error
+ */
 router.get("/seller/rating", auth("seller"), async (req, res) => {
   try {
     const stats = await BuyerSellerRating.aggregate([
@@ -393,6 +577,30 @@ router.get("/seller/rating", auth("seller"), async (req, res) => {
 
 
 
+/**
+ * @swagger
+ * /api/orders/seller/me:
+ *   get:
+ *     summary: Get the authenticated seller's incoming orders (seller only)
+ *     tags: [Orders]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: List of orders for this seller enriched with buyer and product info
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: array
+ *               items:
+ *                 $ref: '#/components/schemas/Order'
+ *       401:
+ *         description: Unauthorized
+ *       403:
+ *         description: Forbidden
+ *       500:
+ *         description: Internal server error
+ */
 router.get("/seller/me", auth("seller"), async (req, res) => {
   try {
     const orders = await Order.find({ sellerId: req.user.id }).sort({ createdAt: -1 }).lean();
@@ -450,6 +658,51 @@ router.get("/seller/me", auth("seller"), async (req, res) => {
   }
 });
 
+/**
+ * @swagger
+ * /api/orders/{id}/status:
+ *   patch:
+ *     summary: Update order status and credit seller earnings if applicable (seller only)
+ *     tags: [Orders]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Order MongoDB ObjectId
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [status]
+ *             properties:
+ *               status:
+ *                 type: string
+ *                 enum: [Placed, Processing, Preparing, Shipping, Delivered, Cancelled]
+ *                 example: Shipping
+ *     responses:
+ *       200:
+ *         description: Updated order object
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Order'
+ *       400:
+ *         description: Invalid status or trying to reopen a cancelled order
+ *       401:
+ *         description: Unauthorized
+ *       403:
+ *         description: Forbidden
+ *       404:
+ *         description: Order not found
+ *       500:
+ *         description: Internal server error
+ */
 router.patch("/:id/status", auth("seller"), async (req, res) => {
   try {
     const { status } = req.body || {};
@@ -496,6 +749,48 @@ router.patch("/:id/status", auth("seller"), async (req, res) => {
   }
 });
 
+/**
+ * @swagger
+ * /api/orders/seller/ratings/buyer:
+ *   post:
+ *     summary: Seller rates a buyer for a completed order (seller only)
+ *     tags: [Orders]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [orderId, buyerId, rating]
+ *             properties:
+ *               orderId:
+ *                 type: string
+ *                 example: "64a1f2b3c4d5e6f7a8b9c0d3"
+ *               buyerId:
+ *                 type: string
+ *                 example: "64a1f2b3c4d5e6f7a8b9c0d1"
+ *               rating:
+ *                 type: integer
+ *                 minimum: 1
+ *                 maximum: 5
+ *                 example: 5
+ *               comment:
+ *                 type: string
+ *                 example: "Great buyer, fast payment!"
+ *     responses:
+ *       201:
+ *         description: Rating created or updated
+ *       400:
+ *         description: Missing required fields or invalid rating
+ *       401:
+ *         description: Unauthorized
+ *       404:
+ *         description: Order not found for this buyer
+ *       500:
+ *         description: Internal server error
+ */
 router.post("/seller/ratings/buyer", auth("seller"), async (req, res) => {
   try {
     const { orderId, buyerId, rating, comment } = req.body || {};
@@ -518,6 +813,48 @@ router.post("/seller/ratings/buyer", auth("seller"), async (req, res) => {
   }
 });
 
+/**
+ * @swagger
+ * /api/orders/buyer/ratings/seller:
+ *   post:
+ *     summary: Buyer rates a seller for a completed order (buyer only)
+ *     tags: [Orders]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [orderId, sellerId, rating]
+ *             properties:
+ *               orderId:
+ *                 type: string
+ *                 example: "64a1f2b3c4d5e6f7a8b9c0d3"
+ *               sellerId:
+ *                 type: string
+ *                 example: "64a1f2b3c4d5e6f7a8b9c0d2"
+ *               rating:
+ *                 type: integer
+ *                 minimum: 1
+ *                 maximum: 5
+ *                 example: 4
+ *               comment:
+ *                 type: string
+ *                 example: "Excellent seller, product as described!"
+ *     responses:
+ *       201:
+ *         description: Rating created or updated, seller rating summary refreshed
+ *       400:
+ *         description: Missing required fields or invalid rating
+ *       401:
+ *         description: Unauthorized
+ *       404:
+ *         description: Order not found for this seller
+ *       500:
+ *         description: Internal server error
+ */
 router.post("/buyer/ratings/seller", auth("buyer"), async (req, res) => {
   try {
     const { orderId, sellerId, rating, comment } = req.body || {};

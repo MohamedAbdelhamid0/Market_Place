@@ -9,6 +9,63 @@ const router = express.Router();
 const BUYER_LATE_DELIVERY_REASON = "Late Delivery";
 const SELLER_NOT_RECEIVED_REASON = "Package Not Received";
 
+/**
+ * @swagger
+ * tags:
+ *   name: Flags
+ *   description: Reporting system for late deliveries and undelivered packages
+ */
+
+/**
+ * @swagger
+ * /api/flags:
+ *   post:
+ *     summary: Report a user (buyer reports late delivery; seller reports package not received)
+ *     tags: [Flags]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [reportedUserId, reason]
+ *             properties:
+ *               reportedUserId:
+ *                 type: string
+ *                 example: "64a1f2b3c4d5e6f7a8b9c0d2"
+ *               reason:
+ *                 type: string
+ *                 enum: ["Late Delivery", "Package Not Received"]
+ *                 example: "Late Delivery"
+ *               orderId:
+ *                 type: string
+ *                 description: Required for both reason types
+ *                 example: "64a1f2b3c4d5e6f7a8b9c0d3"
+ *               details:
+ *                 type: string
+ *                 example: "Order was 2 weeks late"
+ *     responses:
+ *       201:
+ *         description: Flag created successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Flag'
+ *       400:
+ *         description: Validation error (missing fields, invalid order state)
+ *       401:
+ *         description: Unauthorized
+ *       403:
+ *         description: Wrong role for this report reason
+ *       404:
+ *         description: Reported user or order not found
+ *       409:
+ *         description: Duplicate flag for this order
+ *       500:
+ *         description: Internal server error
+ */
 // POST /flags — create a flag (buyer or seller)
 router.post("/", auth(), async (req, res) => {
   try {
@@ -78,6 +135,30 @@ router.post("/", auth(), async (req, res) => {
   }
 });
 
+/**
+ * @swagger
+ * /api/flags/seller/reports:
+ *   get:
+ *     summary: Get all flags involving the authenticated seller (seller only)
+ *     tags: [Flags]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: List of flags (filed by or against this seller), newest first, max 100
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: array
+ *               items:
+ *                 $ref: '#/components/schemas/Flag'
+ *       401:
+ *         description: Unauthorized
+ *       403:
+ *         description: Forbidden
+ *       500:
+ *         description: Internal server error
+ */
 // GET /flags/seller/reports — seller sees only flags that involve them
 router.get("/seller/reports", auth("seller"), async (req, res) => {
   try {
@@ -100,6 +181,30 @@ router.get("/seller/reports", auth("seller"), async (req, res) => {
   }
 });
 
+/**
+ * @swagger
+ * /api/flags/buyer/my-flags:
+ *   get:
+ *     summary: Get all flags submitted by or against the authenticated buyer (buyer only)
+ *     tags: [Flags]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: List of flags involving this buyer, newest first
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: array
+ *               items:
+ *                 $ref: '#/components/schemas/Flag'
+ *       401:
+ *         description: Unauthorized
+ *       403:
+ *         description: Forbidden
+ *       500:
+ *         description: Internal server error
+ */
 // GET /flags/buyer/my-flags — buyer sees flags they submitted + flags filed against them
 router.get("/buyer/my-flags", auth("buyer"), async (req, res) => {
   try {
@@ -120,6 +225,41 @@ router.get("/buyer/my-flags", auth("buyer"), async (req, res) => {
   }
 });
 
+/**
+ * @swagger
+ * /api/flags/{id}:
+ *   delete:
+ *     summary: Resolve and remove a flag (only the person who filed it can delete it)
+ *     tags: [Flags]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Flag MongoDB ObjectId
+ *     responses:
+ *       200:
+ *         description: Flag resolved and removed, reported user's flag count decremented
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 message:
+ *                   type: string
+ *                   example: "Flag resolved and removed"
+ *       401:
+ *         description: Unauthorized
+ *       403:
+ *         description: You can only resolve flags you submitted
+ *       404:
+ *         description: Flag not found
+ *       500:
+ *         description: Internal server error
+ */
 // DELETE /flags/:id — resolve (remove) a flag, only by the person who filed it
 router.delete("/:id", auth(), async (req, res) => {
   try {

@@ -4,6 +4,8 @@ const dotenv = require("dotenv");
 const mongoose = require("mongoose");
 const path = require("path");
 const fs = require("fs");
+const swaggerUi = require("swagger-ui-express");
+const swaggerSpec = require("./swagger");
 
 const authRoutes = require("./routes/auth.routes");
 const productRoutes = require("./routes/products.routes");
@@ -29,6 +31,7 @@ app.use("/uploads", express.static(uploadsRoot));
 app.get("/", (_req, res) => {
   res.send("Marketplace API is running. Go to /api/health");
 });
+app.use("/api-docs", swaggerUi.serve, swaggerUi.setup(swaggerSpec));
 app.use("/api/auth", authRoutes);
 app.use("/api/products", productRoutes);
 app.use("/api/orders", orderRoutes);

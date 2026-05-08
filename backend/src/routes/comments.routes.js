@@ -5,6 +5,62 @@ const { auth } = require("../middleware/auth");
 
 const router = express.Router();
 
+/**
+ * @swagger
+ * tags:
+ *   name: Comments
+ *   description: Product reviews and AI-powered review summaries
+ */
+
+/**
+ * @swagger
+ * /api/comments:
+ *   post:
+ *     summary: Add or update a product review (authenticated users — updates if already reviewed)
+ *     tags: [Comments]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [productId, text, rating]
+ *             properties:
+ *               productId:
+ *                 type: string
+ *                 example: "64a1f2b3c4d5e6f7a8b9c0d4"
+ *               text:
+ *                 type: string
+ *                 example: "Great product, very fast delivery!"
+ *               rating:
+ *                 type: integer
+ *                 minimum: 1
+ *                 maximum: 5
+ *                 example: 5
+ *     responses:
+ *       201:
+ *         description: Review created successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Comment'
+ *       200:
+ *         description: Existing review updated (rating changed)
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Comment'
+ *       400:
+ *         description: Missing fields or invalid rating
+ *       401:
+ *         description: Unauthorized
+ *       409:
+ *         description: Already reviewed with same rating — no change needed
+ *       500:
+ *         description: Internal server error
+ */
 router.post("/", auth(), async (req, res) => {
   try {
     const { productId, text, rating } = req.body || {};
@@ -89,6 +145,32 @@ router.post("/", auth(), async (req, res) => {
   }
 });
 
+/**
+ * @swagger
+ * /api/comments/product/{productId}:
+ *   get:
+ *     summary: Get all reviews for a product (public)
+ *     tags: [Comments]
+ *     security: []
+ *     parameters:
+ *       - in: path
+ *         name: productId
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Product MongoDB ObjectId
+ *     responses:
+ *       200:
+ *         description: Array of reviews sorted by newest first
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: array
+ *               items:
+ *                 $ref: '#/components/schemas/Comment'
+ *       500:
+ *         description: Internal server error
+ */
 router.get("/product/:productId", async (req, res) => {
   try {
     const comments = await Comment.find({ productId: req.params.productId }).sort({ createdAt: -1 });
@@ -105,6 +187,43 @@ function basicFallbackSummary(comments, avg) {
   return `Based on ${comments.length} review(s), the average rating is ${avg.toFixed(1)}/5 with ${tone} feedback.`;
 }
 
+/**
+ * @swagger
+ * /api/comments/product/{productId}/summarize:
+ *   get:
+ *     summary: Get an AI-powered summary of product reviews (falls back to keyword analysis if no Groq key)
+ *     tags: [Comments]
+ *     security: []
+ *     parameters:
+ *       - in: path
+ *         name: productId
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Product MongoDB ObjectId
+ *     responses:
+ *       200:
+ *         description: Review summary object
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 summary:
+ *                   type: string
+ *                   example: "Buyers love the sound quality and fast delivery. Minor complaints about packaging."
+ *                 sampleSize:
+ *                   type: integer
+ *                   example: 12
+ *                 averageRating:
+ *                   type: number
+ *                   example: 4.2
+ *                 aiGenerated:
+ *                   type: boolean
+ *                   example: true
+ *       500:
+ *         description: Internal server error
+ */
 router.get("/product/:productId/summarize", async (req, res) => {
   let comments = [];
   try {

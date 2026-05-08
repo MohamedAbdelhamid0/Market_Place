@@ -14,6 +14,62 @@ function createToken(user) {
   );
 }
 
+/**
+ * @swagger
+ * tags:
+ *   name: Auth
+ *   description: User registration and login
+ */
+
+/**
+ * @swagger
+ * /api/auth/register:
+ *   post:
+ *     summary: Register a new user (buyer or seller)
+ *     tags: [Auth]
+ *     security: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             allOf:
+ *               - $ref: '#/components/schemas/RegisterInput'
+ *               - type: object
+ *                 properties:
+ *                   businessName:
+ *                     type: string
+ *                     description: Required only when role is "seller"
+ *                     example: "John's Electronics"
+ *           examples:
+ *             buyer:
+ *               summary: Register as buyer
+ *               value: { name: "Jane Doe", email: "jane@example.com", password: "Secret123!", role: "buyer" }
+ *             seller:
+ *               summary: Register as seller
+ *               value: { name: "John Doe", email: "john@example.com", password: "Secret123!", role: "seller", businessName: "John's Electronics" }
+ *     responses:
+ *       201:
+ *         description: User registered successfully — returns JWT token and user info
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/AuthResponse'
+ *       400:
+ *         description: Validation error (missing fields, invalid email or weak password)
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ *       409:
+ *         description: Email already registered
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ *       500:
+ *         description: Internal server error
+ */
 router.post("/register", async (req, res) => {
   try {
     const { name, email, password, role, businessName } = req.body || {};
@@ -67,6 +123,44 @@ router.post("/register", async (req, res) => {
   }
 });
 
+/**
+ * @swagger
+ * /api/auth/login:
+ *   post:
+ *     summary: Login and receive a JWT token
+ *     tags: [Auth]
+ *     security: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             $ref: '#/components/schemas/LoginInput'
+ *           example:
+ *             email: "john@example.com"
+ *             password: "Secret123!"
+ *     responses:
+ *       200:
+ *         description: Login successful — returns JWT token and user info
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/AuthResponse'
+ *       400:
+ *         description: Missing or invalid email/password fields
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ *       401:
+ *         description: Invalid credentials
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ *       500:
+ *         description: Internal server error
+ */
 router.post("/login", async (req, res) => {
   try {
     const { email, password } = req.body || {};

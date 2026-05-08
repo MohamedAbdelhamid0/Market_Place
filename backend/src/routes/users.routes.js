@@ -109,6 +109,49 @@ async function buildBuyerCartPayload(userId) {
   };
 }
 
+/**
+ * @swagger
+ * tags:
+ *   name: Users
+ *   description: Buyer and seller profile, cart, wishlist, and address management
+ */
+
+/**
+ * @swagger
+ * /api/users/seller/me/profile:
+ *   get:
+ *     summary: Get the authenticated seller's profile (seller only)
+ *     tags: [Users]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Seller profile object
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 name: { type: string }
+ *                 businessName: { type: string }
+ *                 email: { type: string }
+ *                 supportEmail: { type: string }
+ *                 phone: { type: string }
+ *                 addressLine: { type: string }
+ *                 city: { type: string }
+ *                 country: { type: string }
+ *                 balance: { type: number }
+ *                 sellerRating: { type: number }
+ *                 sellerReviewCount: { type: integer }
+ *       401:
+ *         description: Unauthorized
+ *       403:
+ *         description: Forbidden
+ *       404:
+ *         description: Seller not found
+ *       500:
+ *         description: Internal server error
+ */
 router.get("/seller/me/profile", auth("seller"), async (req, res) => {
   try {
     const user = await User.findById(req.user.id).select("name businessName email supportEmail phone addressLine city country balance sellerRating sellerReviewCount");
@@ -119,6 +162,40 @@ router.get("/seller/me/profile", auth("seller"), async (req, res) => {
   }
 });
 
+/**
+ * @swagger
+ * /api/users/seller/me/profile:
+ *   patch:
+ *     summary: Update the authenticated seller's profile (seller only)
+ *     tags: [Users]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               name: { type: string }
+ *               businessName: { type: string }
+ *               email: { type: string, format: email }
+ *               supportEmail: { type: string, format: email }
+ *               phone: { type: string }
+ *               addressLine: { type: string }
+ *               city: { type: string }
+ *               country: { type: string }
+ *     responses:
+ *       200:
+ *         description: Updated seller profile
+ *       401:
+ *         description: Unauthorized
+ *       403:
+ *         description: Forbidden
+ *       409:
+ *         description: Email already in use
+ *       500:
+ *         description: Internal server error
+ */
 router.patch("/seller/me/profile", auth("seller"), async (req, res) => {
   try {
     const allowed = ["name", "businessName", "email", "supportEmail", "phone", "addressLine", "city", "country"];
@@ -147,6 +224,41 @@ router.patch("/seller/me/profile", auth("seller"), async (req, res) => {
   }
 });
 
+/**
+ * @swagger
+ * /api/users/buyer/me/profile:
+ *   get:
+ *     summary: Get the authenticated buyer's profile (buyer only)
+ *     tags: [Users]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Buyer profile with saved addresses
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 name: { type: string }
+ *                 email: { type: string }
+ *                 phone: { type: string }
+ *                 addressLine: { type: string }
+ *                 city: { type: string }
+ *                 country: { type: string }
+ *                 addresses:
+ *                   type: array
+ *                   items:
+ *                     $ref: '#/components/schemas/Address'
+ *       401:
+ *         description: Unauthorized
+ *       403:
+ *         description: Forbidden
+ *       404:
+ *         description: Buyer not found
+ *       500:
+ *         description: Internal server error
+ */
 router.get("/buyer/me/profile", auth("buyer"), async (req, res) => {
   try {
     const user = await User.findById(req.user.id).select("name email phone addressLine city country addresses");
@@ -157,6 +269,42 @@ router.get("/buyer/me/profile", auth("buyer"), async (req, res) => {
   }
 });
 
+/**
+ * @swagger
+ * /api/users/buyer/me/profile:
+ *   patch:
+ *     summary: Update the authenticated buyer's profile and/or addresses (buyer only)
+ *     tags: [Users]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               name: { type: string }
+ *               email: { type: string, format: email }
+ *               phone: { type: string }
+ *               addressLine: { type: string }
+ *               city: { type: string }
+ *               country: { type: string }
+ *               addresses:
+ *                 type: array
+ *                 items:
+ *                   $ref: '#/components/schemas/Address'
+ *     responses:
+ *       200:
+ *         description: Updated buyer profile
+ *       400:
+ *         description: Invalid addresses format
+ *       401:
+ *         description: Unauthorized
+ *       409:
+ *         description: Email already in use
+ *       500:
+ *         description: Internal server error
+ */
 router.patch("/buyer/me/profile", auth("buyer"), async (req, res) => {
   try {
     const allowed = ["name", "email", "phone", "addressLine", "city", "country"];
@@ -215,6 +363,38 @@ router.patch("/buyer/me/profile", auth("buyer"), async (req, res) => {
   }
 });
 
+/**
+ * @swagger
+ * /api/users/buyer/me/addresses:
+ *   post:
+ *     summary: Add a new delivery address to buyer profile (buyer only)
+ *     tags: [Users]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             $ref: '#/components/schemas/Address'
+ *     responses:
+ *       201:
+ *         description: Updated addresses array
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: array
+ *               items:
+ *                 $ref: '#/components/schemas/Address'
+ *       400:
+ *         description: Missing required address fields
+ *       401:
+ *         description: Unauthorized
+ *       404:
+ *         description: Buyer not found
+ *       500:
+ *         description: Internal server error
+ */
 router.post("/buyer/me/addresses", auth("buyer"), async (req, res) => {
   try {
     const address = normalizeAddress(req.body || {});
@@ -240,6 +420,33 @@ router.post("/buyer/me/addresses", auth("buyer"), async (req, res) => {
   }
 });
 
+/**
+ * @swagger
+ * /api/users/buyer/me/addresses/{addressId}:
+ *   delete:
+ *     summary: Delete a saved delivery address (buyer only — must keep at least one)
+ *     tags: [Users]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: addressId
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Address subdocument ObjectId
+ *     responses:
+ *       200:
+ *         description: Updated addresses array after deletion
+ *       400:
+ *         description: Cannot delete last address
+ *       401:
+ *         description: Unauthorized
+ *       404:
+ *         description: Address or buyer not found
+ *       500:
+ *         description: Internal server error
+ */
 router.delete("/buyer/me/addresses/:addressId", auth("buyer"), async (req, res) => {
   try {
     const user = await User.findById(req.user.id);
@@ -265,6 +472,37 @@ router.delete("/buyer/me/addresses/:addressId", auth("buyer"), async (req, res) 
   }
 });
 
+/**
+ * @swagger
+ * /api/users/buyer/me/cart:
+ *   get:
+ *     summary: Get the authenticated buyer's cart with live product pricing (buyer only)
+ *     tags: [Users]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Cart payload with items, subtotal, and item count
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 items:
+ *                   type: array
+ *                   items:
+ *                     $ref: '#/components/schemas/CartItem'
+ *                 subtotal:
+ *                   type: number
+ *                   example: 199.98
+ *                 itemCount:
+ *                   type: integer
+ *                   example: 2
+ *       401:
+ *         description: Unauthorized
+ *       500:
+ *         description: Internal server error
+ */
 router.get("/buyer/me/cart", auth("buyer"), async (req, res) => {
   try {
     const payload = await buildBuyerCartPayload(req.user.id);
@@ -274,6 +512,41 @@ router.get("/buyer/me/cart", auth("buyer"), async (req, res) => {
   }
 });
 
+/**
+ * @swagger
+ * /api/users/buyer/me/cart/items:
+ *   post:
+ *     summary: Add an item to the cart (buyer only — increments if already exists)
+ *     tags: [Users]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [productId]
+ *             properties:
+ *               productId:
+ *                 type: string
+ *                 example: "64a1f2b3c4d5e6f7a8b9c0d4"
+ *               quantity:
+ *                 type: integer
+ *                 default: 1
+ *                 example: 2
+ *     responses:
+ *       201:
+ *         description: Updated cart payload
+ *       400:
+ *         description: productId is required
+ *       401:
+ *         description: Unauthorized
+ *       404:
+ *         description: Product not found
+ *       500:
+ *         description: Internal server error
+ */
 router.post("/buyer/me/cart/items", auth("buyer"), async (req, res) => {
   try {
     const productId = req.body?.productId;
@@ -302,6 +575,41 @@ router.post("/buyer/me/cart/items", auth("buyer"), async (req, res) => {
   }
 });
 
+/**
+ * @swagger
+ * /api/users/buyer/me/cart/items/{productId}:
+ *   patch:
+ *     summary: Update quantity of a cart item (quantity=0 removes the item) (buyer only)
+ *     tags: [Users]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: productId
+ *         required: true
+ *         schema:
+ *           type: string
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               quantity:
+ *                 type: integer
+ *                 minimum: 0
+ *                 example: 3
+ *     responses:
+ *       200:
+ *         description: Updated cart payload
+ *       400:
+ *         description: Invalid quantity
+ *       401:
+ *         description: Unauthorized
+ *       500:
+ *         description: Internal server error
+ */
 router.patch("/buyer/me/cart/items/:productId", auth("buyer"), async (req, res) => {
   try {
     const quantity = Number(req.body?.quantity || 0);
@@ -327,6 +635,30 @@ router.patch("/buyer/me/cart/items/:productId", auth("buyer"), async (req, res) 
   }
 });
 
+/**
+ * @swagger
+ * /api/users/buyer/me/cart/items/{productId}:
+ *   delete:
+ *     summary: Remove a specific item from the cart (buyer only)
+ *     tags: [Users]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: productId
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: Updated cart payload after removal
+ *       401:
+ *         description: Unauthorized
+ *       404:
+ *         description: Buyer not found
+ *       500:
+ *         description: Internal server error
+ */
 router.delete("/buyer/me/cart/items/:productId", auth("buyer"), async (req, res) => {
   try {
     const user = await User.findById(req.user.id);
@@ -342,6 +674,30 @@ router.delete("/buyer/me/cart/items/:productId", auth("buyer"), async (req, res)
   }
 });
 
+/**
+ * @swagger
+ * /api/users/buyer/me/cart:
+ *   delete:
+ *     summary: Clear the entire cart (buyer only)
+ *     tags: [Users]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Empty cart payload
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 items: { type: array, example: [] }
+ *                 subtotal: { type: number, example: 0 }
+ *                 itemCount: { type: integer, example: 0 }
+ *       401:
+ *         description: Unauthorized
+ *       500:
+ *         description: Internal server error
+ */
 router.delete("/buyer/me/cart", auth("buyer"), async (req, res) => {
   try {
     const user = await User.findById(req.user.id);
@@ -355,6 +711,28 @@ router.delete("/buyer/me/cart", auth("buyer"), async (req, res) => {
   }
 });
 
+/**
+ * @swagger
+ * /api/users/buyer/me/wishlist:
+ *   get:
+ *     summary: Get the authenticated buyer's wishlist (buyer only)
+ *     tags: [Users]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: List of wishlisted active products
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: array
+ *               items:
+ *                 $ref: '#/components/schemas/Product'
+ *       401:
+ *         description: Unauthorized
+ *       500:
+ *         description: Internal server error
+ */
 router.get("/buyer/me/wishlist", auth("buyer"), async (req, res) => {
   try {
     const user = await User.findById(req.user.id).select("wishlist").lean();
@@ -367,6 +745,30 @@ router.get("/buyer/me/wishlist", auth("buyer"), async (req, res) => {
   }
 });
 
+/**
+ * @swagger
+ * /api/users/buyer/me/wishlist/{productId}:
+ *   post:
+ *     summary: Add a product to the wishlist (buyer only — no-op if already present)
+ *     tags: [Users]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: productId
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       201:
+ *         description: Updated wishlist IDs
+ *       401:
+ *         description: Unauthorized
+ *       404:
+ *         description: Product not found
+ *       500:
+ *         description: Internal server error
+ */
 router.post("/buyer/me/wishlist/:productId", auth("buyer"), async (req, res) => {
   try {
     const product = await Product.findOne({ _id: req.params.productId, isActive: true });
@@ -384,6 +786,28 @@ router.post("/buyer/me/wishlist/:productId", auth("buyer"), async (req, res) => 
   }
 });
 
+/**
+ * @swagger
+ * /api/users/buyer/me/wishlist/{productId}:
+ *   delete:
+ *     summary: Remove a product from the wishlist (buyer only)
+ *     tags: [Users]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: productId
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: Updated wishlist IDs after removal
+ *       401:
+ *         description: Unauthorized
+ *       500:
+ *         description: Internal server error
+ */
 router.delete("/buyer/me/wishlist/:productId", auth("buyer"), async (req, res) => {
   try {
     await User.updateOne({ _id: req.user.id }, { $pull: { wishlist: req.params.productId } });
@@ -394,6 +818,58 @@ router.delete("/buyer/me/wishlist/:productId", auth("buyer"), async (req, res) =
   }
 });
 
+/**
+ * @swagger
+ * /api/users/buyer/me/cart/checkout:
+ *   post:
+ *     summary: Checkout the entire cart — groups items by seller and creates one order per seller (buyer only)
+ *     tags: [Users]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [paymentMethod]
+ *             properties:
+ *               paymentMethod:
+ *                 type: string
+ *                 enum: ["Cash on Delivery", "Credit Card"]
+ *                 example: "Cash on Delivery"
+ *               deliveryAddressId:
+ *                 type: string
+ *                 description: ID of a saved address (uses default if omitted)
+ *               cardDetails:
+ *                 type: object
+ *                 description: Required when paymentMethod is "Credit Card"
+ *                 properties:
+ *                   cardNumber: { type: string, example: "4111111111111111" }
+ *                   cardHolder: { type: string, example: "John Doe" }
+ *                   cardExpiry: { type: string, example: "12/26" }
+ *                   cardCVV: { type: string, example: "123" }
+ *     responses:
+ *       201:
+ *         description: Checkout successful — one order created per seller
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 message: { type: string, example: "Checkout successful" }
+ *                 orders:
+ *                   type: array
+ *                   items:
+ *                     $ref: '#/components/schemas/Order'
+ *                 orderCount: { type: integer, example: 2 }
+ *       400:
+ *         description: Cart empty, out of stock, or invalid card/address
+ *       401:
+ *         description: Unauthorized
+ *       500:
+ *         description: Internal server error
+ */
 router.post("/buyer/me/cart/checkout", auth("buyer"), async (req, res) => {
   try {
     const paymentMethod = normalizePaymentMethod(req.body?.paymentMethod);
